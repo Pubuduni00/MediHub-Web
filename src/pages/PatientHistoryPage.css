@@ -1,0 +1,6 @@
+.patient-history-page {}
+.patient-history-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px; flex-wrap: wrap; gap: 12px;
+}

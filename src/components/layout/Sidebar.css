@@ -1,0 +1,180 @@
+/* ═══════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════ */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);       /* #0D2137 dark navy */
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+}
+.sidebar.collapsed { width: var(--sidebar-collapsed); }
+
+/* ── Logo ── */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  min-height: var(--topbar-height);
+  position: relative;
+  flex-shrink: 0;
+}
+.sidebar-logo-icon {
+  width: 36px; height: 36px;
+  background: var(--primary);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+.sidebar-logo-text { flex: 1; overflow: hidden; }
+.sidebar-logo-name {
+  display: block;
+  font-size: 15px; font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+.sidebar-logo-tagline {
+  display: block;
+  font-size: 10px;
+  color: var(--sidebar-text);         /* #A8BCCF */
+  margin-top: 1px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+.sidebar-collapse-btn {
+  position: absolute; right: 10px; top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.08);
+  border: none; cursor: pointer;
+  color: var(--sidebar-text);
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.sidebar-collapse-btn:hover {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+}
+
+/* ── User ── */
+.sidebar-user {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.sidebar-avatar {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sidebar-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover; border-radius: 50%;
+}
+.sidebar-user-info { overflow: hidden; flex: 1; }
+.sidebar-user-name {
+  font-size: 13px; font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  margin: 0;
+}
+.sidebar-user-role {
+  font-size: 11px;
+  color: var(--secondary);            /* teal accent */
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* ── Nav ── */
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 8px 10px;
+  display: flex; flex-direction: column;
+  gap: 2px;
+}
+.sidebar-nav::-webkit-scrollbar { width: 0; }
+
+.sidebar-section-label {
+  font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.10em;
+  color: rgba(168,188,207,0.45);
+  padding: 8px 8px 4px;
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* ── Nav Item (NavLink + button share this) ── */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: var(--sidebar-text);         /* #A8BCCF */
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-size: 13.5px; font-weight: 500;
+  transition: var(--transition);
+  white-space: nowrap;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.sidebar-item:hover {
+  background: var(--sidebar-hover);  /* #132D4A */
+  color: #ffffff;
+}
+.sidebar-item.active {
+  background: var(--primary);        /* #0A6EBD */
+  color: #ffffff;
+}
+.sidebar-item-icon { flex-shrink: 0; }
+.sidebar-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Bottom / Logout ── */
+.sidebar-bottom {
+  padding: 8px 10px 14px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.sidebar-logout {
+  color: #ff8a8a !important;
+}
+.sidebar-logout:hover {
+  background: rgba(231,76,60,0.15) !important;
+  color: #ff6b6b !important;
+}
+
+/* ── Collapsed adjustments ── */
+.sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding: 9px;
+  gap: 0;
+}
+.sidebar.collapsed .sidebar-section-label {
+  opacity: 0;
+  pointer-events: none;
+}
+.sidebar.collapsed .sidebar-user {
+  justify-content: center;
+  padding: 12px 10px;
+}

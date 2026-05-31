@@ -1,0 +1,6 @@
+.appts-layout { display: flex; flex-direction: column; gap: 20px; }
+.appts-list-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
+}
