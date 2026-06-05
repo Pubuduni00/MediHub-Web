@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState } from 'react';
 
 const DataContext = createContext(null);
 
-// Initial demo data
 const initialPatients = [
   { id: 'PT001', name: 'Rohan Fernando', age: 45, gender: 'Male', dob: '1979-03-12', phone: '0771234567', email: 'rohan@email.com', address: '12 Galle Road, Colombo 03', bloodGroup: 'B+', nic: '791234567V', emergencyContact: '0777654321', emergencyName: 'Priya Fernando', registeredDate: '2024-01-15', assignedDoctors: ['DR001'], status: 'Active' },
   { id: 'PT002', name: 'Kamala Perera', age: 32, gender: 'Female', dob: '1992-07-25', phone: '0712345678', email: 'kamala@email.com', address: '45 Kandy Road, Colombo 07', bloodGroup: 'O+', nic: '9234567890V', emergencyContact: '0718765432', emergencyName: 'Sunil Perera', registeredDate: '2024-02-20', assignedDoctors: ['DR002'], status: 'Active' },
@@ -29,13 +28,13 @@ const initialAppointments = [
 const initialPatientLogs = [
   {
     id: 'LOG001', patientId: 'PT001', doctorId: 'DR001', doctorName: 'Dr. Amara Patel', date: '2024-06-10',
-    examination: { chiefComplaint: 'Chest pain and shortness of breath', bp: '140/90', pulse: '88', temp: '37.1', spo2: '97', weight: '78', height: '172', clinicalFindings: 'Mild hypertension. Heart sounds normal. No murmurs.', diagnosis: 'Hypertension Grade 1', plan: 'Lifestyle modification, follow-up in 4 weeks' },
+    examination: { chiefComplaint: 'Chest pain and shortness of breath', bp: '140/90', pulse: '88', temp: '37.1', spo2: '97', weight: '78', height: '172', clinicalFindings: 'Mild hypertension. Heart sounds normal.', diagnosis: 'Hypertension Grade 1', plan: 'Lifestyle modification, follow-up in 4 weeks' },
     drugs: [{ drug: 'Amlodipine', dose: '5mg', frequency: 'Once daily', duration: '30 days', mealInstruction: 'After meals', notes: 'Take in the morning' }],
     investigations: [{ type: 'ECG', dateOrdered: '2024-06-10', results: 'Normal sinus rhythm', referenceRange: 'Normal', status: 'Normal', notes: '' }]
   },
   {
     id: 'LOG002', patientId: 'PT001', doctorId: 'DR001', doctorName: 'Dr. Amara Patel', date: '2024-07-08',
-    examination: { chiefComplaint: 'Follow-up for hypertension', bp: '135/85', pulse: '80', temp: '36.8', spo2: '98', weight: '77', height: '172', clinicalFindings: 'BP improving. Patient compliant with medication.', diagnosis: 'Hypertension - improving', plan: 'Continue medication, repeat bloods in 3 months' },
+    examination: { chiefComplaint: 'Follow-up for hypertension', bp: '135/85', pulse: '80', temp: '36.8', spo2: '98', weight: '77', height: '172', clinicalFindings: 'BP improving.', diagnosis: 'Hypertension - improving', plan: 'Continue medication, repeat bloods in 3 months' },
     drugs: [{ drug: 'Amlodipine', dose: '5mg', frequency: 'Once daily', duration: '90 days', mealInstruction: 'After meals', notes: '' }, { drug: 'Aspirin', dose: '75mg', frequency: 'Once daily', duration: '90 days', mealInstruction: 'After meals', notes: 'Do not crush' }],
     investigations: [{ type: 'Lipid Profile', dateOrdered: '2024-07-08', results: 'Total Cholesterol: 5.2 mmol/L', referenceRange: '<5.0 mmol/L', status: 'Abnormal', notes: 'Borderline high' }]
   },
@@ -67,7 +66,7 @@ export const DataProvider = ({ children }) => {
   const [alerts, setAlerts] = useState(initialAlerts);
   const [symptomLogs, setSymptomLogs] = useState(initialSymptomLogs);
 
-  // Patients
+  // ── Patients ──
   const addPatient = (patient) => {
     const id = `PT${String(patients.length + 1).padStart(3, '0')}`;
     const newPatient = { ...patient, id, registeredDate: new Date().toISOString().split('T')[0], assignedDoctors: [], status: 'Active' };
@@ -76,8 +75,6 @@ export const DataProvider = ({ children }) => {
   };
   const updatePatient = (id, updates) => setPatients(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   const getPatientById = (id) => patients.find(p => p.id === id);
-
-  // Assign patient to doctor
   const assignPatientToDoctor = (patientId, doctorId) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId && !p.assignedDoctors.includes(doctorId)) {
@@ -88,17 +85,18 @@ export const DataProvider = ({ children }) => {
   };
   const getPatientsForDoctor = (doctorId) => patients.filter(p => p.assignedDoctors.includes(doctorId));
 
-  // Appointments
+  // ── Appointments ──
   const addAppointment = (appt) => {
     const id = `AP${String(appointments.length + 1).padStart(3, '0')}`;
     const newAppt = { ...appt, id };
     setAppointments(prev => [...prev, newAppt]);
     return newAppt;
   };
+  const updateAppointment = (id, updates) => setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
   const getAppointmentsForDate = (date) => appointments.filter(a => a.date === date);
   const getAppointmentsForDoctor = (doctorId) => appointments.filter(a => a.doctorId === doctorId);
 
-  // Patient Logs
+  // ── Patient Logs ──
   const addPatientLog = (log) => {
     const id = `LOG${String(patientLogs.length + 1).padStart(3, '0')}`;
     const newLog = { ...log, id, date: new Date().toISOString().split('T')[0] };
@@ -108,7 +106,7 @@ export const DataProvider = ({ children }) => {
   const getLogsForPatient = (patientId) => patientLogs.filter(l => l.patientId === patientId);
   const getLogsForDate = (patientId, date) => patientLogs.filter(l => l.patientId === patientId && l.date === date);
 
-  // Prescriptions
+  // ── Prescriptions ──
   const addPrescription = (rx) => {
     const id = `RX${String(prescriptions.length + 1).padStart(3, '0')}`;
     const newRx = { ...rx, id, date: new Date().toISOString().split('T')[0] };
@@ -117,7 +115,7 @@ export const DataProvider = ({ children }) => {
   };
   const getPrescriptionsForPatient = (patientId) => prescriptions.filter(r => r.patientId === patientId);
 
-  // Doctors
+  // ── Doctors ──
   const addDoctor = (doc) => {
     const id = `DR${String(doctors.length + 1).padStart(3, '0')}`;
     const newDoc = { ...doc, id, employeeId: id };
@@ -125,7 +123,7 @@ export const DataProvider = ({ children }) => {
     return newDoc;
   };
 
-  // Alerts
+  // ── Alerts ──
   const markAlertRead = (id) => setAlerts(prev => prev.map(a => a.id === id ? { ...a, read: true } : a));
   const markAllAlertsRead = () => setAlerts(prev => prev.map(a => ({ ...a, read: true })));
   const unreadCount = alerts.filter(a => !a.read).length;
@@ -134,10 +132,10 @@ export const DataProvider = ({ children }) => {
     <DataContext.Provider value={{
       patients, doctors, appointments, patientLogs, prescriptions, alerts, symptomLogs,
       addPatient, updatePatient, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
-      addAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
+      addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient,
-      addDoctor, setDoctors,
+      addDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
     }}>
