@@ -19,7 +19,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "dev": "concurrently \"npm start\" \"npm start --prefix server\""
   },
   "browserslist": {
     "production": [
@@ -29,5 +30,8 @@
     "development": [
       "last 1 chrome version"
     ]
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

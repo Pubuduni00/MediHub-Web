@@ -34,11 +34,11 @@ export default function RegisterPatientModal({ isOpen, onClose }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     const age = calcAge(form.dob);
-    const patient = addPatient({ ...form, age });
+    const patient = await addPatient({ ...form, age });
     setSuccess(patient);
     setForm(EMPTY);
   };
