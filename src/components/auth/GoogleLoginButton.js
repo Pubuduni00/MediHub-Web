@@ -20,7 +20,7 @@ export default function GoogleLoginButton() {
         });
         const profile = await res.json();
         // profile contains: name, email, picture, sub
-        const result = loginDoctor(profile);
+        const result = await loginDoctor(profile);
         if (result.success) navigate('/dashboard');
         else setError('Your Google account is not registered as a doctor.');
       } catch {
