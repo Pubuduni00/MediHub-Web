@@ -1,6 +1,105 @@
 .appts-layout { display: flex; flex-direction: column; gap: 20px; }
-.appts-list-header {
+
+/* Two-column layout */
+.appts-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 248px;
+  gap: 16px;
+  align-items: start;
+}
+
+.appts-day-header {
   display: flex; align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── Table — auto layout, let browser size columns naturally ── */
+.appts-table-wrap { width: 100%; overflow: hidden; }
+
+.appts-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;       /* KEY: let content decide widths */
+}
+
+.appts-table-wrap thead tr { background: var(--bg-base); }
+
+.appts-table-wrap th {
+  padding: 9px 10px;
+  text-align: left;
+  font-size: 11px; font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.appts-table-wrap td {
+  padding: 10px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Patient name column is the only one that can shrink */
+.appts-table-wrap td.col-patient {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.appts-table-wrap tbody tr:last-child td { border-bottom: none; }
+.appts-table-wrap tbody tr:hover { background: var(--primary-light); }
+
+/* Status pill */
+.appts-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.appts-status-pill.confirmed {
+  background: var(--accent-green-light);
+  color: var(--accent-green);
+}
+.appts-status-pill.pending {
+  background: var(--accent-orange-light);
+  color: var(--accent-orange);
+}
+.appts-status-pill.cancelled {
+  background: var(--accent-red-light);
+  color: var(--accent-red);
+}
+
+/* Edit button */
+.appts-edit-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--bg-white);
+  cursor: pointer; color: var(--text-secondary);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.appts-edit-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+.appts-edit-btn:disabled {
+  opacity: 0.3; cursor: not-allowed;
+}
+
+/* Mini calendar sticky */
+.appts-mini-calendar {
+  position: sticky;
+  top: calc(var(--topbar-height) + 16px);
+}
+
+@media (max-width: 1060px) {
+  .appts-main-grid { grid-template-columns: 1fr; }
+  .appts-mini-calendar { position: static; }
 }

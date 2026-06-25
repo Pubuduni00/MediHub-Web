@@ -22,10 +22,10 @@ export default function AddDoctorModal({ isOpen, onClose }) {
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    const doc = addDoctor({ ...form, joinDate: new Date().toISOString().split('T')[0] });
+    const doc = await addDoctor({ ...form, joinDate: new Date().toISOString().split('T')[0] });
     setSaved(doc);
     setForm({ ...EMPTY });
   };

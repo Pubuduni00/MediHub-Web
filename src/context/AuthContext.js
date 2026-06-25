@@ -2,20 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-// ── Staff credentials (replace with API call when backend is ready) ──
-const STAFF_CREDENTIALS = [
-  { id: 'ST001', email: 'admin@medihub.com',      password: 'Staff@1234', name: 'Sarah Johnson',   role: 'staff', department: 'Administration' },
-  { id: 'ST002', email: 'reception@medihub.com',  password: 'Staff@1234', name: 'Michael Chen',    role: 'staff', department: 'Reception' },
-  { id: 'ST003', email: 'staff@medihub.com',      password: 'Staff@1234', name: 'Pubuduni Mayanthi',role: 'staff', department: 'General Medicine' },
-];
-
-// ── Known doctors (matched by Google email after OAuth) ──
-// Add any real doctor Google emails here before going to production
-const KNOWN_DOCTORS = [
-  { id: 'DR001', email: 'amara.patel@medihub.com',  name: 'Dr. Amara Patel',   specialty: 'Cardiology',       department: 'Cardiology' },
-  { id: 'DR002', email: 'james.wilson@medihub.com', name: 'Dr. James Wilson',  specialty: 'General Medicine', department: 'General Medicine' },
-  { id: 'DR003', email: 'priya.nair@medihub.com',   name: 'Dr. Priya Nair',    specialty: 'Neurology',        department: 'Neurology' },
-];
+const API_URL = 'http://localhost:5000/api';
+const KNOWN_DOCTORS = [];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser]     = useState(null);
@@ -30,49 +18,62 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Staff login ──
-  const loginStaff = (email, password) => {
-    const found = STAFF_CREDENTIALS.find(
-      s => s.email.toLowerCase() === email.toLowerCase() && s.password === password
-    );
-    if (found) {
-      const userData = { ...found };
-      setUser(userData);
-      localStorage.setItem('medihub_user', JSON.stringify(userData));
+  const loginStaff = async (email, password) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/staff-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        return { success: false, error: errData.error || 'Invalid credentials' };
+      }
+      
+      const userData = await res.json();
+      const sessionUser = { ...userData, role: 'staff' };
+      setUser(sessionUser);
+      localStorage.setItem('medihub_user', JSON.stringify(sessionUser));
       return { success: true };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: 'Could not connect to authentication server' };
     }
-    return { success: false, error: 'Invalid email or password. Please try again.' };
   };
 
   // ── Doctor login via Google OAuth ──
-  // googleProfile = { name, email, picture } from Google userinfo endpoint
-  const loginDoctor = (googleProfile) => {
-    // Check if email matches a known doctor
-    let doctor = KNOWN_DOCTORS.find(
-      d => d.email.toLowerCase() === googleProfile.email?.toLowerCase()
-    );
-
-    if (!doctor) {
-      // ── DEMO FALLBACK ──
-      // Any Google account that isn't in KNOWN_DOCTORS logs in as a demo doctor.
-      // In production: remove this block and return { success: false, error: '...' }
-      doctor = {
-        id: 'DR001',
-        name: googleProfile.name || 'Demo Doctor',
-        email: googleProfile.email,
-        specialty: 'General Medicine',
-        department: 'General Medicine',
+  const loginDoctor = async (googleProfile) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/doctor-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: googleProfile.email,
+          name: googleProfile.name,
+          picture: googleProfile.picture
+        })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        return { success: false, error: errData.error || 'Google login failed' };
+      }
+      
+      const doctorData = await res.json();
+      const sessionUser = {
+        ...doctorData,
+        role: 'doctor',
+        avatar: googleProfile.picture || doctorData.avatar || null
       };
+      
+      setUser(sessionUser);
+      localStorage.setItem('medihub_user', JSON.stringify(sessionUser));
+      return { success: true };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: 'Could not connect to authentication server' };
     }
-
-    const userData = {
-      ...doctor,
-      role: 'doctor',                          // ← THIS is what isDoctor checks
-      avatar: googleProfile.picture || null,
-    };
-
-    setUser(userData);
-    localStorage.setItem('medihub_user', JSON.stringify(userData));
-    return { success: true };
   };
 
   const logout = () => {

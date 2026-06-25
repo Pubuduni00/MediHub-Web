@@ -17,7 +17,7 @@ export default function LockPage() {
     e.preventDefault();
     setError(''); setLoading(true);
     await new Promise(r => setTimeout(r, 400));
-    const result = loginStaff(user?.email, password);
+    const result = await loginStaff(user?.email, password);
     if (result.success) navigate('/dashboard');
     else setError('Incorrect password. Please try again.');
     setLoading(false);

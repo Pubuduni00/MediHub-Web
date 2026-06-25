@@ -29,8 +29,8 @@ export default function AddPrescriptionModal({ isOpen, onClose, patientId, prefi
   const addDrug = () => setDrugs(d => [...d, { ...EMPTY_RX }]);
   const removeDrug = (i) => setDrugs(d => d.filter((_,idx) => idx!==i));
 
-  const handleSave = () => {
-    addPrescription({ patientId, drugs, addedBy: user?.id, logId: selectedLog });
+  const handleSave = async () => {
+    await addPrescription({ patientId, drugs, addedBy: user?.id, logId: selectedLog });
     setSaved(true);
   };
 
