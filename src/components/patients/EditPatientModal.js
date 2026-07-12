@@ -87,7 +87,7 @@ export default function EditPatientModal({ isOpen, onClose, patient }) {
             <div className="form-group">
               <label className="form-label">Date of Birth *</label>
               <input type="date" className={`form-control ${errors.dob?'border-danger':''}`} value={form.dob || ''} onChange={e=>set('dob',e.target.value)} />
-              {form.dob && <p style={{ fontSize:11.5, color(--text-muted)?:'var(--text-muted)', marginTop:3 }}>Age: {calcAge(form.dob)} years</p>}
+              {form.dob && <p style={{ fontSize:11.5, color: 'var(--text-muted)', marginTop:3 }}>Age: {calcAge(form.dob)} years</p>}
               {errors.dob && <p style={{ color:'var(--accent-red)', fontSize:11.5, marginTop:3 }}>{errors.dob}</p>}
             </div>
             <div className="form-group">
