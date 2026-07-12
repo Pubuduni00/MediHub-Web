@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
@@ -16,12 +16,27 @@ export default function PatientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isDoctor } = useAuth();
-  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors } = useData();
+  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, syncPatientToMobile, symptomLogs } = useData();
 
   const patient = getPatientById(id);
   const [showLog,     setShowLog]     = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAppt,    setShowAppt]    = useState(false);
+  const [syncing,     setSyncing]     = useState(false);
+  const [syncStatus,  setSyncStatus]  = useState(null);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncStatus(null);
+    const res = await syncPatientToMobile(id);
+    if (res.success) {
+      setSyncStatus({ type: 'success', text: 'Synced to mobile successfully!' });
+      setTimeout(() => setSyncStatus(null), 5000);
+    } else {
+      setSyncStatus({ type: 'error', text: res.error || 'Failed to sync' });
+    }
+    setSyncing(false);
+  };
 
   if (!patient) return (
     <div style={{ textAlign:'center', padding:60 }}>
@@ -32,6 +47,7 @@ export default function PatientProfilePage() {
 
   const logs         = getLogsForPatient(id);
   const prescriptions = getPrescriptionsForPatient(id);
+  const patientSymptomLogs = (symptomLogs || []).filter(sl => sl.patientId === id);
   const initials     = patient.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
   const assignedDoctorNames = (patient.assignedDoctors||[])
     .map(dId => doctors.find(d=>d.id===dId)?.name).filter(Boolean);
@@ -57,6 +73,15 @@ export default function PatientProfilePage() {
               <span style={{ background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:20, fontSize:12 }}>{patient.age} years</span>
               <span style={{ background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:700 }}>{patient.bloodGroup}</span>
             </div>
+
+            <div style={{ display:'flex', justifyContent:'center', marginTop:12 }}>
+              {patient.firebaseUid ? (
+                <Badge label="Mobile Connected" variant="success" dot />
+              ) : (
+                <Badge label="Not linked to mobile" variant="muted" dot />
+              )}
+            </div>
+
             {/* Action buttons — only for doctors, no prescription button */}
             {isDoctor && (
               <div className="profile-actions">
@@ -74,6 +99,47 @@ export default function PatientProfilePage() {
                 <button className="btn btn-sm" style={{ background:'rgba(255,255,255,0.2)', color:'#fff', border:'1px solid rgba(255,255,255,0.3)' }} onClick={()=>setShowAppt(true)}>
                   <Calendar size={13}/> Add Appointment
                 </button>
+              </div>
+            )}
+
+            {/* Sync to Mobile Button (if linked to firebase) */}
+            {patient.firebaseUid && (
+              <div style={{ padding: '0 12px 12px 12px', marginTop: 10 }}>
+                <button 
+                  className={`btn btn-sm ${syncing ? 'loading' : ''}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    background: 'var(--accent-green)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 12px',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                  onClick={handleSync}
+                  disabled={syncing}
+                >
+                  <Activity size={13}/> {syncing ? 'Syncing...' : 'Sync to Mobile'}
+                </button>
+                {syncStatus && (
+                  <p style={{ 
+                    fontSize: 11, 
+                    textAlign: 'center', 
+                    margin: '6px 0 0 0',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    background: syncStatus.type === 'success' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 67, 53, 0.15)',
+                    color: syncStatus.type === 'success' ? '#34a853' : '#ea4335'
+                  }}>
+                    {syncStatus.text}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -244,6 +310,48 @@ export default function PatientProfilePage() {
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Symptom Logs */}
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Activity size={15} color="var(--primary)" />
+                Symptom Logs (from Mobile App)
+              </h3>
+              <span className="badge badge-muted">{patientSymptomLogs.length} reported</span>
+            </div>
+            {patientSymptomLogs.length === 0 ? (
+              <p style={{ color:'var(--text-muted)', fontSize:13.5, padding:'12px 0' }}>No symptom logs submitted from mobile app yet.</p>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {patientSymptomLogs.slice().reverse().map(log => {
+                  const dateStr = log.date ? format(new Date(log.date), 'yyyy-MM-dd HH:mm') : '—';
+                  const severityVariant = log.severity === 'Severe' ? 'danger' : log.severity === 'Moderate' ? 'warning' : 'success';
+                  return (
+                    <div key={log.id} style={{ padding:'12px 14px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                          {(log.symptoms || []).map((s, i) => (
+                            <span key={i} style={{ fontSize:11.5, background:'var(--bg-white)', border:'1px solid var(--border)', padding:'1px 6px', borderRadius:10 }}>
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                        <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>{dateStr}</span>
+                      </div>
+                      {log.notes && (
+                        <p style={{ fontSize:12.5, fontStyle:'italic', color:'var(--text-secondary)', marginBottom:6 }}>"{log.notes}"</p>
+                      )}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>via {log.reportedVia || 'Mobile App'}</span>
+                        <Badge label={log.severity} variant={severityVariant} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

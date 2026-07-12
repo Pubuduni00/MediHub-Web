@@ -79,6 +79,19 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const syncPatientToMobile = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/sync/patient/${id}`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error("Failed to sync patient:", err);
+      return { success: false, error: 'Could not connect to sync server' };
+    }
+  };
+
   const getPatientById = (id) => patients.find(p => p.id === id);
 
   const assignPatientToDoctor = async (patientId, doctorId) => {
@@ -241,7 +254,7 @@ export const DataProvider = ({ children }) => {
   return (
     <DataContext.Provider value={{
       patients, doctors, appointments, patientLogs, prescriptions, alerts, symptomLogs, loading,
-      addPatient, updatePatient, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
+      addPatient, updatePatient, syncPatientToMobile, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
       addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient,

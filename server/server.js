@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { initializeApp, cert } = require('firebase-admin/app');
@@ -852,6 +852,39 @@ app.post('/api/sync/all', async (req, res) => {
     res.json({ success: true, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Receive profile updates from mobile app
+app.put('/api/mobile/update-profile', async (req, res) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey !== process.env.CLOUD_FUNCTION_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { firebase_uid, dateOfBirth, phoneNumber, emergencyContactName, emergencyContactNumber } = req.body;
+    if (!firebase_uid) return res.status(400).json({ error: 'firebase_uid required' });
+
+    const patient = await dbHelpers.get(
+      'SELECT * FROM patients WHERE firebase_uid = ?', [firebase_uid]
+    );
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    await dbHelpers.run(
+      `UPDATE patients SET
+        dob = COALESCE(?, dob),
+        phone = COALESCE(?, phone),
+        emergencyName = COALESCE(?, emergencyName),
+        emergencyContact = COALESCE(?, emergencyContact)
+       WHERE firebase_uid = ?`,
+      [dateOfBirth, phoneNumber, emergencyContactName, emergencyContactNumber, firebase_uid]
+    );
+
+    console.log(`Profile updated in PostgreSQL for patient ${patient.name}`);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Mobile profile update error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
