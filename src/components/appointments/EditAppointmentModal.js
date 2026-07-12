@@ -6,16 +6,15 @@ import { Edit2 } from 'lucide-react';
 const TYPES = ['Consultation','Follow-up','Review','Emergency','Procedure','Lab Visit'];
 
 export default function EditAppointmentModal({ appointment, onClose }) {
-  const { setAppointments, appointments } = useData();
+  const { updateAppointment } = useData();
   const [form, setForm] = useState({ ...appointment });
   const [saved, setSaved] = useState(false);
 
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
 
-  const handleSave = () => {
-    // Update appointment in context
-    const updated = appointments.map(a => a.id === appointment.id ? { ...a, ...form } : a);
-    setAppointments(updated);
+  const handleSave = async () => {
+    // Update appointment in context and DB
+    await updateAppointment(appointment.id, form);
     setSaved(true);
   };
 

@@ -253,7 +253,7 @@ function generateMedicalReportPDF(patient, doctor, form, signed) {
     if (form.sickLeave) {
       if (y>250){doc.addPage();y=20;}
       doc.setFontSize(9.5); doc.setFont('helvetica','bold');
-      doc.text('8.','Sick Leave', margin, y);
+      doc.text('8.', margin, y);
       doc.text('Sick Leave', margin+8, y); y+=6;
       doc.setFont('helvetica','normal');
       doc.setFillColor(248,251,255);
