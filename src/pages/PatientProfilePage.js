@@ -9,6 +9,7 @@ import PatientLogModal from '../components/patients/PatientLogModal';
 import MedicalReportGenerator from '../components/patients/MedicalReportGenerator';
 import MedicalHistoryModal from '../components/patients/MedicalHistoryModal';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
+import EditPatientModal from '../components/patients/EditPatientModal';
 import Badge from '../components/common/Badge';
 import './PatientProfilePage.css';
 
@@ -22,6 +23,7 @@ export default function PatientProfilePage() {
   const [showLog,     setShowLog]     = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAppt,    setShowAppt]    = useState(false);
+  const [showEditPatient, setShowEditPatient] = useState(false);
   const [syncing,     setSyncing]     = useState(false);
   const [syncStatus,  setSyncStatus]  = useState(null);
 
@@ -146,7 +148,16 @@ export default function PatientProfilePage() {
 
           {/* Personal Info */}
           <div className="card">
-            <div className="card-header"><h3 className="card-title">Personal Details</h3></div>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="card-title">Personal Details</h3>
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ padding: '3px 8px', fontSize: 12, height: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
+                onClick={() => setShowEditPatient(true)}
+              >
+                <Plus size={12}/> Edit
+              </button>
+            </div>
             {[
               { icon:User,   label:'Date of Birth', val:patient.dob||'N/A' },
               { icon:Phone,  label:'Phone',         val:patient.phone },
@@ -394,6 +405,7 @@ export default function PatientProfilePage() {
       <PatientLogModal   isOpen={showLog}     onClose={()=>setShowLog(false)}     patientId={id}/>
       <MedicalHistoryModal isOpen={showHistory} onClose={()=>setShowHistory(false)} patientId={id} existingHistory={patient.medicalHistory}/>
       <AddAppointmentModal isOpen={showAppt}   onClose={()=>setShowAppt(false)}   prefillDate={format(new Date(),'yyyy-MM-dd')}/>
+      <EditPatientModal    isOpen={showEditPatient} onClose={()=>setShowEditPatient(false)} patient={patient}/>
     </div>
   );
 }
