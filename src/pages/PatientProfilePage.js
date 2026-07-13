@@ -10,6 +10,7 @@ import MedicalReportGenerator from '../components/patients/MedicalReportGenerato
 import MedicalHistoryModal from '../components/patients/MedicalHistoryModal';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
 import EditPatientModal from '../components/patients/EditPatientModal';
+import LogViewPopup from '../components/patients/LogViewPopup';
 import Badge from '../components/common/Badge';
 import './PatientProfilePage.css';
 
@@ -24,6 +25,7 @@ export default function PatientProfilePage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showAppt,    setShowAppt]    = useState(false);
   const [showEditPatient, setShowEditPatient] = useState(false);
+  const [selectedLogDate, setSelectedLogDate] = useState(null);
   const [syncing,     setSyncing]     = useState(false);
   const [syncStatus,  setSyncStatus]  = useState(null);
 
@@ -311,7 +313,20 @@ export default function PatientProfilePage() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {logs.slice().reverse().slice(0,5).map(log=>(
-                  <div key={log.id} style={{ padding:'12px 14px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}>
+                  <div 
+                    key={log.id} 
+                    onClick={() => setSelectedLogDate(log.date)}
+                    style={{ 
+                      padding:'12px 14px', 
+                      borderRadius:'var(--radius-md)', 
+                      border:'1px solid var(--border)', 
+                      background:'var(--bg-base)',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-base)'}
+                  >
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
                       <p style={{ fontWeight:600, fontSize:13.5 }}>{log.examination?.diagnosis||'Log Entry'}</p>
                       <span style={{ fontSize:12, color:'var(--text-muted)' }}>{log.date}</span>
@@ -406,6 +421,14 @@ export default function PatientProfilePage() {
       <MedicalHistoryModal isOpen={showHistory} onClose={()=>setShowHistory(false)} patientId={id} existingHistory={patient.medicalHistory}/>
       <AddAppointmentModal isOpen={showAppt}   onClose={()=>setShowAppt(false)}   prefillDate={format(new Date(),'yyyy-MM-dd')}/>
       <EditPatientModal    isOpen={showEditPatient} onClose={()=>setShowEditPatient(false)} patient={patient}/>
+      
+      {selectedLogDate && (
+        <LogViewPopup 
+          logs={logs.filter(l => l.date === selectedLogDate)} 
+          date={selectedLogDate} 
+          onClose={() => setSelectedLogDate(null)} 
+        />
+      )}
     </div>
   );
 }

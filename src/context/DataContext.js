@@ -160,6 +160,21 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const deleteAppointment = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/appointments/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setAppointments(prev => prev.filter(a => a.id !== id));
+        return true;
+      }
+    } catch (err) {
+      console.error("Failed to delete appointment:", err);
+    }
+    return false;
+  };
+
   const getAppointmentsForDate = (date) => appointments.filter(a => a.date === date);
   const getAppointmentsForDoctor = (doctorId) => appointments.filter(a => a.doctorId === doctorId);
 
@@ -272,7 +287,7 @@ export const DataProvider = ({ children }) => {
     <DataContext.Provider value={{
       patients, doctors, appointments, patientLogs, prescriptions, alerts, symptomLogs, loading,
       addPatient, updatePatient, syncPatientToMobile, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
-      addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
+      addAppointment, updateAppointment, deleteAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient,
       addDoctor, updateDoctor, setDoctors, setAppointments,

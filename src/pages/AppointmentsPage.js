@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
-import { Download, Plus, Edit2, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
@@ -17,8 +17,14 @@ import './AppointmentsPage.css';
 const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
 export default function AppointmentsPage() {
-  const { appointments } = useData();
+  const { appointments, deleteAppointment } = useData();
   const { isDoctor, user } = useAuth();
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this appointment?")) {
+      await deleteAppointment(id);
+    }
+  };
   const [showAdd, setShowAdd]           = useState(false);
   const [editAppt, setEditAppt]         = useState(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(),'yyyy-MM-dd'));
@@ -157,15 +163,25 @@ export default function AppointmentsPage() {
                       </td>
                       <td style={{ width:40, color:'var(--text-muted)', fontSize:12 }}>{a.duration||30}m</td>
                       <td style={{ width:108 }}><StatusPill status={a.status}/></td>
-                      <td style={{ width:44 }}>
-                        <button
-                          className="appts-edit-btn"
-                          onClick={() => !isPastDate(selectedDate) && setEditAppt(a)}
-                          disabled={isPastDate(selectedDate)}
-                          title={isPastDate(selectedDate) ? 'Cannot edit past appointments' : 'Edit'}
-                        >
-                          <Edit2 size={12}/>
-                        </button>
+                      <td style={{ width:76 }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className="appts-edit-btn"
+                            onClick={() => !isPastDate(selectedDate) && setEditAppt(a)}
+                            disabled={isPastDate(selectedDate)}
+                            title={isPastDate(selectedDate) ? 'Cannot edit past appointments' : 'Edit'}
+                          >
+                            <Edit2 size={12}/>
+                          </button>
+                          <button
+                            className="appts-edit-btn"
+                            style={{ color: 'var(--accent-red)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                            onClick={() => handleDelete(a.id)}
+                            title="Delete Appointment"
+                          >
+                            <Trash2 size={12}/>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

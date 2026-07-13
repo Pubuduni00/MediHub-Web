@@ -76,6 +76,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserProfile = async (updates) => {
+    try {
+      const endpoint = user.role === 'doctor' ? `/doctors/${user.id}` : `/staff/${user.id}`;
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const updatedData = await res.json();
+        const sessionUser = { ...user, ...updatedData };
+        setUser(sessionUser);
+        localStorage.setItem('medihub_user', JSON.stringify(sessionUser));
+        return { success: true };
+      }
+    } catch (err) {
+      console.error("Failed to update profile:", err);
+    }
+    return { success: false, error: 'Failed to update profile' };
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('medihub_user');
@@ -91,6 +112,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       loginStaff,
       loginDoctor,
+      updateUserProfile,
       logout,
       isDoctor,   // ← exported so PatientTable, Sidebar, etc. can use it
       isStaff,

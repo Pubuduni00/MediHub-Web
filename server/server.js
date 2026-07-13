@@ -100,7 +100,27 @@ app.post('/api/auth/staff-login', async (req, res) => {
       return res.json(userData);
     }
     return res.status(401).json({ error: 'Invalid email or password' });
+});
+
+app.put('/api/staff/:id', async (req, res) => {
+  const { name, email } = req.body;
+  try {
+    const existing = await dbHelpers.get('SELECT * FROM staff WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Staff member not found' });
+
+    await dbHelpers.run(
+      `UPDATE staff SET
+        name = COALESCE(?, name),
+        email = COALESCE(?, email)
+       WHERE id = ?`,
+      [name, email, req.params.id]
+    );
+
+    const updated = await dbHelpers.get('SELECT * FROM staff WHERE id = ?', [req.params.id]);
+    const { password: _, ...userData } = updated;
+    res.json(userData);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -548,6 +568,19 @@ app.put('/api/appointments/:id', async (req, res) => {
     updated.investigations = updated.investigations ? JSON.parse(updated.investigations) : [];
     res.json(updated);
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/appointments/:id', async (req, res) => {
+  try {
+    const existing = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Appointment not found' });
+
+    await dbHelpers.run('DELETE FROM appointments WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
