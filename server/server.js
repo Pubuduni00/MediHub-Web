@@ -66,6 +66,19 @@ async function syncAppointmentToFirestore(firebaseUid, apptId, apptData) {
   }
 }
 
+async function deleteAppointmentFromFirestore(firebaseUid, apptId) {
+  if (!db_firebase || !firebaseUid) return;
+  try {
+    await db_firebase
+      .collection('users').doc(firebaseUid)
+      .collection('appointments').doc(apptId)
+      .delete();
+    console.log('Appointment deleted from Firestore:', apptId);
+  } catch (err) {
+    console.error('Appointment Firestore delete error:', err.message);
+  }
+}
+
 // â”€â”€ ID Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function generateNextId(tableName, prefix) {
   try {
@@ -578,6 +591,13 @@ app.delete('/api/appointments/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Appointment not found' });
 
     await dbHelpers.run('DELETE FROM appointments WHERE id = ?', [req.params.id]);
+
+    // Delete from Firestore
+    const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [existing.patientId]);
+    if (patient && patient.firebaseUid) {
+      await deleteAppointmentFromFirestore(patient.firebaseUid, req.params.id);
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);

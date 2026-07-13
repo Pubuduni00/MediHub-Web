@@ -91,17 +91,17 @@ export default function SettingsPage() {
                   <label className="form-label">Email Address</label>
                   <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">{isDoctor ? 'Specialty' : 'Department'}</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={specialtyOrDept} 
-                    onChange={e => setSpecialtyOrDept(e.target.value)} 
-                    disabled={!isDoctor} 
-                    style={!isDoctor ? { background: 'var(--bg-base)', cursor: 'not-allowed' } : {}} 
-                  />
-                </div>
+                {isDoctor && (
+                  <div className="form-group">
+                    <label className="form-label">Specialty</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      value={specialtyOrDept} 
+                      onChange={e => setSpecialtyOrDept(e.target.value)} 
+                    />
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label">Employee ID</label>
                   <input 
