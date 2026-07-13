@@ -64,7 +64,7 @@ export default function SettingsPage() {
                 {[
                   { label: 'Full Name', val: user?.name, ph: 'Your full name' },
                   { label: 'Email Address', val: user?.email, ph: 'your@email.com', type: 'email' },
-                  { label: isDoctor ? 'Specialty' : 'Department', val: isDoctor ? user?.specialty : user?.department, ph: '' },
+                  { label: isDoctor ? 'Specialty' : 'Department', val: isDoctor ? user?.specialty : user?.department, ph: '', disabled: !isDoctor },
                   { label: 'Employee ID', val: user?.id, ph: '', disabled: true },
                 ].map((f, i) => (
                   <div key={i} className="form-group">
@@ -82,7 +82,6 @@ export default function SettingsPage() {
               <div className="card-header"><h3 className="card-title">Notification Preferences</h3></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {[
-                  { key: 'appointments', label: 'Appointment reminders', desc: 'Get notified about upcoming appointments' },
                   { key: 'alerts', label: 'Patient alerts', desc: 'Receive alerts for critical patient events' },
                   { key: 'symptoms', label: 'Symptom reports', desc: 'Be notified when patients report symptoms' },
                   { key: 'reports', label: 'Report generation', desc: 'Notifications when reports are ready' },
