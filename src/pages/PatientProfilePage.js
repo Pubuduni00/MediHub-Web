@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Activity } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Activity, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
@@ -317,23 +317,44 @@ export default function PatientProfilePage() {
                     key={log.id} 
                     onClick={() => setSelectedLogDate(log.date)}
                     style={{ 
-                      padding:'12px 14px', 
+                      padding:'14px 16px', 
                       borderRadius:'var(--radius-md)', 
                       border:'1px solid var(--border)', 
-                      background:'var(--bg-base)',
+                      background:'var(--bg-white)',
                       cursor: 'pointer',
-                      transition: 'var(--transition)'
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      boxShadow: 'var(--shadow-sm)'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-base)'}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
                   >
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                      <p style={{ fontWeight:600, fontSize:13.5 }}>{log.examination?.diagnosis||'Log Entry'}</p>
-                      <span style={{ fontSize:12, color:'var(--text-muted)' }}>{log.date}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                        <p style={{ fontWeight:700, fontSize:14, color: 'var(--text-primary)' }}>
+                          {log.examination?.diagnosis||'Log Entry'}
+                        </p>
+                        <span style={{ fontSize:12, color:'var(--text-secondary)', fontWeight: 500 }}>{log.date}</span>
+                      </div>
+                      <p style={{ fontSize:13, color:'var(--text-secondary)' }}>
+                        Logged by <strong style={{ color: 'var(--primary)' }}>{log.doctorName}</strong> · {log.drugs?.length||0} drug(s) · {log.investigations?.length||0} investigation(s)
+                      </p>
                     </div>
-                    <p style={{ fontSize:12.5, color:'var(--text-muted)' }}>
-                      {log.doctorName} · {log.drugs?.length||0} drug(s) · {log.investigations?.length||0} investigation(s)
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', color: 'var(--primary)', fontWeight: 600, fontSize: 12, gap: 4 }}>
+                      <span>View</span>
+                      <ChevronRight size={14} />
+                    </div>
                   </div>
                 ))}
               </div>

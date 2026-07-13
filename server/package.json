@@ -4,7 +4,7 @@
   "description": "Backend server for Medihub clinic management system",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "npx -y nodemon server.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
