@@ -113,6 +113,9 @@ app.post('/api/auth/staff-login', async (req, res) => {
       return res.json(userData);
     }
     return res.status(401).json({ error: 'Invalid email or password' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.put('/api/staff/:id', async (req, res) => {
