@@ -1,16 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Lock, Bell, Palette, Save, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/common/Avatar';
 import './SettingsPage.css';
 
 export default function SettingsPage() {
-  const { user, isDoctor } = useAuth();
+  const { user, isDoctor, updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [saved, setSaved] = useState(false);
   const [notifs, setNotifs] = useState({ appointments: true, alerts: true, symptoms: true, reports: false });
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [specialtyOrDept, setSpecialtyOrDept] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setEmail(user.email || '');
+      setSpecialtyOrDept(isDoctor ? user.specialty || '' : user.department || '');
+    }
+  }, [user, isDoctor]);
+
+  const handleSave = async () => {
+    const updates = { name, email };
+    if (isDoctor) {
+      updates.specialty = specialtyOrDept;
+    }
+    const res = await updateUserProfile(updates);
+    if (res.success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -61,17 +83,35 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="grid-2">
-                {[
-                  { label: 'Full Name', val: user?.name, ph: 'Your full name' },
-                  { label: 'Email Address', val: user?.email, ph: 'your@email.com', type: 'email' },
-                  { label: isDoctor ? 'Specialty' : 'Department', val: isDoctor ? user?.specialty : user?.department, ph: '', disabled: !isDoctor },
-                  { label: 'Employee ID', val: user?.id, ph: '', disabled: true },
-                ].map((f, i) => (
-                  <div key={i} className="form-group">
-                    <label className="form-label">{f.label}</label>
-                    <input type={f.type || 'text'} className="form-control" defaultValue={f.val || ''} placeholder={f.ph} disabled={f.disabled} style={f.disabled ? { background: 'var(--bg-base)', cursor: 'not-allowed' } : {}} />
-                  </div>
-                ))}
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} placeholder="Your full name" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">{isDoctor ? 'Specialty' : 'Department'}</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    value={specialtyOrDept} 
+                    onChange={e => setSpecialtyOrDept(e.target.value)} 
+                    disabled={!isDoctor} 
+                    style={!isDoctor ? { background: 'var(--bg-base)', cursor: 'not-allowed' } : {}} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Employee ID</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    value={user?.id || ''} 
+                    disabled 
+                    style={{ background: 'var(--bg-base)', cursor: 'not-allowed' }} 
+                  />
+                </div>
               </div>
               <button className="btn btn-primary" onClick={handleSave}><Save size={14} /> Save Changes</button>
             </div>
