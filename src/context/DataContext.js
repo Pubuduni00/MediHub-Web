@@ -222,6 +222,23 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const updateDoctor = async (id, updates) => {
+    try {
+      const res = await fetch(`${API_URL}/doctors/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const updatedDoc = await res.json();
+        setDoctors(prev => prev.map(d => d.id === id ? updatedDoc : d));
+        return updatedDoc;
+      }
+    } catch (err) {
+      console.error("Failed to update doctor:", err);
+    }
+  };
+
   // ── Alerts ──
   const markAlertRead = async (id) => {
     try {
@@ -258,7 +275,7 @@ export const DataProvider = ({ children }) => {
       addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient,
-      addDoctor, setDoctors, setAppointments,
+      addDoctor, updateDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
     }}>

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, Edit2 } from 'lucide-react';
 import Badge from '../common/Badge';
 import Avatar from '../common/Avatar';
 import EmptyState from '../common/EmptyState';
 
-export default function DoctorTable({ doctors, onAdd }) {
+export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments }) {
   const [search, setSearch] = useState('');
 
   const filtered = doctors.filter(d => {
     const q = search.toLowerCase();
-    return d.name.toLowerCase().includes(q) || d.specialty.toLowerCase().includes(q) || d.employeeId.toLowerCase().includes(q);
+    const name = d.name ? d.name.toLowerCase() : '';
+    const specialty = d.specialty ? d.specialty.toLowerCase() : '';
+    const employeeId = d.employeeId ? d.employeeId.toLowerCase() : '';
+    return name.includes(q) || specialty.includes(q) || employeeId.includes(q);
   });
 
   return (
@@ -41,6 +44,7 @@ export default function DoctorTable({ doctors, onAdd }) {
                 <th>Schedule</th>
                 <th>Join Date</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -50,7 +54,14 @@ export default function DoctorTable({ doctors, onAdd }) {
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                       <Avatar name={d.name} size="sm" color="linear-gradient(135deg,var(--primary),var(--secondary))" />
                       <div>
-                        <p style={{ fontWeight:600, fontSize:13.5 }}>{d.name}</p>
+                        <p 
+                          style={{ fontWeight:600, fontSize:13.5, color:'var(--primary)', cursor:'pointer' }}
+                          onClick={() => onViewAppointments && onViewAppointments(d)}
+                          onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                          onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                        >
+                          {d.name}
+                        </p>
                         <p style={{ fontSize:11.5, color:'var(--text-muted)' }}>{d.email}</p>
                       </div>
                     </div>
@@ -63,6 +74,16 @@ export default function DoctorTable({ doctors, onAdd }) {
                   <td style={{ fontSize:12.5 }}>{d.schedule}</td>
                   <td style={{ fontSize:12.5, color:'var(--text-muted)' }}>{d.joinDate}</td>
                   <td><Badge label={d.status} variant={d.status==='Active'?'success':'muted'} dot /></td>
+                  <td>
+                    <button 
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: 4, height: 'auto', minWidth: 'unset', display: 'flex', alignItems: 'center' }}
+                      onClick={() => onEdit && onEdit(d)}
+                      title="Edit Doctor Profile"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -423,7 +423,31 @@ app.post('/api/doctors', async (req, res) => {
   }
 });
 
-// â”€â”€ Appointments Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+app.put('/api/doctors/:id', async (req, res) => {
+  const { name, email, specialty, department, phone, qualification, status, schedule } = req.body;
+  try {
+    const existing = await dbHelpers.get('SELECT * FROM doctors WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Doctor not found' });
+
+    await dbHelpers.run(
+      `UPDATE doctors SET
+        name = COALESCE(?, name), email = COALESCE(?, email),
+        specialty = COALESCE(?, specialty), department = COALESCE(?, department),
+        phone = COALESCE(?, phone), qualification = COALESCE(?, qualification),
+        status = COALESCE(?, status), schedule = COALESCE(?, schedule)
+       WHERE id = ?`,
+      [name, email, specialty, department, phone, qualification, status, schedule, req.params.id]
+    );
+
+    const updated = await dbHelpers.get('SELECT * FROM doctors WHERE id = ?', [req.params.id]);
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── Appointments Endpoints ──
 
 app.get('/api/appointments', async (req, res) => {
   try {
