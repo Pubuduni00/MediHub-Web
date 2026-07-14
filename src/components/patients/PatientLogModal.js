@@ -18,7 +18,7 @@ const MEAL       = ['Before meals','After meals','With meals','On empty stomach'
 const INV_STATUS = ['Normal','Abnormal','Pending','Critical'];
 
 export default function PatientLogModal({ isOpen, onClose, patientId }) {
-  const { addPatientLog } = useData();
+  const { addPatientLog, updateAppointment } = useData();
   const { user } = useAuth();
   const [drugs, setDrugs]                   = useState([{ ...EMPTY_DRUG }]);
   const [investigations, setInvestigations] = useState([{ ...EMPTY_INVEST }]);
@@ -37,7 +37,29 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const removeInvest  = (i) => setInvestigations(d => d.filter((_,idx) => idx!==i));
 
   const handleSave = async () => {
-    await addPatientLog({ patientId, doctorId:user?.id, doctorName:user?.name, examination:exam, drugs, investigations });
+    const activeApptId = sessionStorage.getItem('active_appt_id');
+    const logPayload = { 
+      patientId, 
+      doctorId: user?.id, 
+      doctorName: user?.name, 
+      examination: exam, 
+      drugs, 
+      investigations 
+    };
+    if (activeApptId) {
+      logPayload.appointmentId = activeApptId;
+    }
+
+    await addPatientLog(logPayload);
+
+    // If there is an active appointment, refresh the local appointment state
+    if (activeApptId && investigations && investigations.length > 0) {
+      const investigationTypes = investigations.map(inv => inv.type).filter(Boolean);
+      if (investigationTypes.length > 0) {
+        await updateAppointment(activeApptId, { investigations: investigationTypes });
+      }
+    }
+
     setSaved(true);
   };
 
