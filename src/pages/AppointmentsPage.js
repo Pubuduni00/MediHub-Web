@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,12 @@ const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 export default function AppointmentsPage() {
   const { appointments, deleteAppointment } = useData();
   const { isDoctor, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleStartAppointment = (apptId, patientId) => {
+    sessionStorage.setItem('active_appt_id', apptId);
+    navigate(`/patients/${patientId}`);
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this appointment?")) {
