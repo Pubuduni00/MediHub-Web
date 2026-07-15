@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Activity, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Activity, ChevronRight, StopCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
@@ -17,8 +17,8 @@ import './PatientProfilePage.css';
 export default function PatientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isDoctor } = useAuth();
-  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, syncPatientToMobile, symptomLogs } = useData();
+  const { isDoctor, user } = useAuth();
+  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs } = useData();
 
   const patient = getPatientById(id);
   const [showLog,     setShowLog]     = useState(false);
@@ -26,20 +26,17 @@ export default function PatientProfilePage() {
   const [showAppt,    setShowAppt]    = useState(false);
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [selectedLogDate, setSelectedLogDate] = useState(null);
-  const [syncing,     setSyncing]     = useState(false);
-  const [syncStatus,  setSyncStatus]  = useState(null);
+  const [endingSession, setEndingSession] = useState(false);
 
-  const handleSync = async () => {
-    setSyncing(true);
-    setSyncStatus(null);
-    const res = await syncPatientToMobile(id);
-    if (res.success) {
-      setSyncStatus({ type: 'success', text: 'Synced to mobile successfully!' });
-      setTimeout(() => setSyncStatus(null), 5000);
-    } else {
-      setSyncStatus({ type: 'error', text: res.error || 'Failed to sync' });
-    }
-    setSyncing(false);
+  // Check if we arrived from a started appointment
+  const activeApptId = sessionStorage.getItem('active_appt_id');
+
+  const handleEndSession = async () => {
+    if (!activeApptId) return;
+    setEndingSession(true);
+    await updateAppointment(activeApptId, { status: 'Completed' });
+    sessionStorage.removeItem('active_appt_id');
+    navigate('/appointments');
   };
 
   if (!patient) return (
@@ -59,9 +56,34 @@ export default function PatientProfilePage() {
 
   return (
     <div>
-      <button className="btn btn-ghost btn-sm" onClick={()=>navigate(-1)} style={{ marginBottom:16 }}>
-        <ArrowLeft size={14}/> Back
-      </button>
+      {/* Top navigation bar with optional End Session button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>navigate(-1)}>
+          <ArrowLeft size={14}/> Back
+        </button>
+        {activeApptId && isDoctor && (
+          <button
+            onClick={handleEndSession}
+            disabled={endingSession}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 18px',
+              background: 'var(--accent-red)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 700, fontSize: 13.5,
+              cursor: endingSession ? 'not-allowed' : 'pointer',
+              opacity: endingSession ? 0.7 : 1,
+              boxShadow: '0 2px 8px rgba(239,68,68,0.35)',
+              transition: 'var(--transition)'
+            }}
+          >
+            <StopCircle size={16}/>
+            {endingSession ? 'Ending...' : 'End Session'}
+          </button>
+        )}
+      </div>
 
       <div className="profile-layout">
         {/* ── Sidebar ── */}
@@ -106,46 +128,6 @@ export default function PatientProfilePage() {
               </div>
             )}
 
-            {/* Sync to Mobile Button (if linked to firebase) */}
-            {patient.firebaseUid && (
-              <div style={{ padding: '0 12px 12px 12px', marginTop: 10 }}>
-                <button 
-                  className={`btn btn-sm ${syncing ? 'loading' : ''}`}
-                  style={{
-                    width: '100%',
-                    justifyContent: 'center',
-                    background: 'var(--accent-green)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '8px 12px',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6
-                  }}
-                  onClick={handleSync}
-                  disabled={syncing}
-                >
-                  <Activity size={13}/> {syncing ? 'Syncing...' : 'Sync to Mobile'}
-                </button>
-                {syncStatus && (
-                  <p style={{ 
-                    fontSize: 11, 
-                    textAlign: 'center', 
-                    margin: '6px 0 0 0',
-                    padding: '4px 8px',
-                    borderRadius: 4,
-                    background: syncStatus.type === 'success' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 67, 53, 0.15)',
-                    color: syncStatus.type === 'success' ? '#34a853' : '#ea4335'
-                  }}>
-                    {syncStatus.text}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Personal Info */}

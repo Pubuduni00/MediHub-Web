@@ -233,6 +233,7 @@ app.put('/api/staff/:id', async (req, res) => {
 });
 
 // Doctor Login (Google OAuth)
+// Only allows login if the email was pre-registered by staff in the doctors table
 app.post('/api/auth/doctor-login', async (req, res) => {
   const { email, name, picture } = req.body;
   if (!email) return res.status(400).json({ error: 'Google email is required' });
@@ -242,13 +243,13 @@ app.post('/api/auth/doctor-login', async (req, res) => {
       [email.toLowerCase()]
     );
     if (!doctor) {
-      const id = await generateNextId('doctors', 'DR');
-      await dbHelpers.run(
-        'INSERT INTO doctors (id, name, email, specialty, department, phone, qualification, joinDate, status, schedule, role, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name || 'Doctor', email.toLowerCase(), 'General Medicine', 'General Medicine', '', 'MBBS', new Date().toISOString().split('T')[0], 'Active', 'Mon-Fri, 9AM-5PM', 'doctor', picture || null]
-      );
-      doctor = await dbHelpers.get('SELECT * FROM doctors WHERE id = ?', [id]);
-    } else if (picture && doctor.avatar !== picture) {
+      // Reject Google accounts not pre-registered by staff
+      return res.status(403).json({
+        error: 'Your Google account is not registered as a doctor. Please contact administration to have your email added.'
+      });
+    }
+    // Update avatar if changed
+    if (picture && doctor.avatar !== picture) {
       await dbHelpers.run('UPDATE doctors SET avatar = ? WHERE id = ?', [picture, doctor.id]);
       doctor.avatar = picture;
     }

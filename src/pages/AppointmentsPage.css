@@ -72,6 +72,10 @@
   background: var(--accent-red-light);
   color: var(--accent-red);
 }
+.appts-status-pill.completed {
+  background: var(--accent-green-light);
+  color: var(--accent-green);
+}
 
 /* Edit button */
 .appts-edit-btn {

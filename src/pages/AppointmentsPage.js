@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar, Play } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
@@ -68,7 +68,10 @@ export default function AppointmentsPage() {
   const displayDate = selectedDate ? format(parseISO(selectedDate),'EEEE, dd MMMM yyyy') : '';
 
   const StatusPill = ({ status }) => {
-    const cls = status==='Confirmed' ? 'confirmed' : status==='Pending' ? 'pending' : 'cancelled';
+    const cls = status==='Confirmed' ? 'confirmed'
+      : status==='Pending'   ? 'pending'
+      : status==='Completed' ? 'completed'
+      : 'cancelled';
     return (
       <span className={`appts-status-pill ${cls}`}>
         <span style={{ width:6, height:6, borderRadius:'50%', background:'currentColor', flexShrink:0 }}/>
@@ -109,7 +112,7 @@ export default function AppointmentsPage() {
                 <Search size={12} color="var(--text-muted)"/>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."/>
               </div>
-              {['All','Confirmed','Pending'].map(f=>(
+              {['All','Confirmed','Pending','Completed'].map(f=>(
                 <button key={f} onClick={()=>setFilterStatus(f)}
                   className={`btn btn-sm ${filterStatus===f?'btn-primary':'btn-ghost'}`}
                   style={{ padding:'5px 10px', fontSize:12 }}>
@@ -170,8 +173,25 @@ export default function AppointmentsPage() {
                       </td>
                       <td style={{ width:40, color:'var(--text-muted)', fontSize:12 }}>{a.duration||30}m</td>
                       <td style={{ width:108 }}><StatusPill status={a.status}/></td>
-                      <td style={{ width:76 }}>
+                      <td style={{ width: isDoctor ? 110 : 76 }}>
                         <div style={{ display: 'flex', gap: 6 }}>
+                          {isDoctor && a.status !== 'Completed' && (
+                            <button
+                              className="appts-edit-btn"
+                              style={{
+                                color: '#fff',
+                                background: 'var(--accent-green)',
+                                borderColor: 'var(--accent-green)',
+                                padding: '4px 10px',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                fontWeight: 600, fontSize: 12, borderRadius: 6
+                              }}
+                              onClick={() => handleStartAppointment(a.id, a.patientId)}
+                              title="Start appointment session"
+                            >
+                              <Play size={11} fill="currentColor"/> Start
+                            </button>
+                          )}
                           <button
                             className="appts-edit-btn"
                             onClick={() => !isPastDate(selectedDate) && setEditAppt(a)}
