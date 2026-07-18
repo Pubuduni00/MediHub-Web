@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { format, parseISO, isPast, isToday } from 'date-fns';
-import { Download, Plus, Edit2, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Download, Plus, Edit2, Search, ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
 import EditAppointmentModal from '../components/appointments/EditAppointmentModal';
+import DoctorAvailabilityCalendar from '../components/doctors/DoctorAvailabilityCalendar';
 import { exportAppointmentsPDF } from '../components/appointments/AppointmentPDFExport';
 import EmptyState from '../components/common/EmptyState';
 import {
@@ -25,6 +26,7 @@ export default function AppointmentsPage() {
   const [calMonth, setCalMonth]         = useState(new Date());
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [showAvailability, setShowAvailability] = useState(false);
 
   const calDays = eachDayOfInterval({
     start: startOfWeek(startOfMonth(calMonth)),
@@ -71,6 +73,11 @@ export default function AppointmentsPage() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <p style={{ fontSize:13.5, color:'var(--text-muted)' }}>Schedule management & calendar</p>
         <div style={{ display:'flex', gap:8 }}>
+          {isDoctor && (
+            <button className="btn btn-primary btn-sm" style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff' }} onClick={() => setShowAvailability(true)}>
+              <Calendar size={14}/> My Availability
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm" onClick={()=>exportAppointmentsPDF(dayAppts,selectedDate)}>
             <Download size={14}/> Download PDF
           </button>
@@ -245,6 +252,7 @@ export default function AppointmentsPage() {
 
       <AddAppointmentModal isOpen={showAdd} onClose={()=>setShowAdd(false)} prefillDate={selectedDate}/>
       {editAppt && <EditAppointmentModal appointment={editAppt} onClose={()=>setEditAppt(null)}/>}
+      {showAvailability && <DoctorAvailabilityCalendar doctorId={user?.id} doctorName={user?.name} onClose={() => setShowAvailability(false)} />}
     </div>
   );
 }

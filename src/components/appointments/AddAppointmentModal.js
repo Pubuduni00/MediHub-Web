@@ -4,7 +4,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Calendar } from 'lucide-react';
 
-const EMPTY = { patientId:'', doctorId:'', date:'', time:'', type:'Consultation', details:'', duration:30 };
+const EMPTY = { patientId:'', doctorId:'', date:'', time:'', type:'Consultation', details:'', duration:15 };
 const TYPES = ['Consultation','Follow-up','Review','Emergency','Procedure','Lab Visit'];
 
 export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' }) {
@@ -13,6 +13,29 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
   const [form, setForm] = useState({ ...EMPTY, date: prefillDate, doctorId: isDoctor ? user?.id : '' });
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  React.useEffect(() => {
+    if (form.doctorId && form.date) {
+      fetchSlots(form.doctorId, form.date);
+    } else {
+      setAvailableSlots([]);
+    }
+  }, [form.doctorId, form.date]);
+
+  const fetchSlots = async (docId, dateStr) => {
+    try {
+      setLoadingSlots(true);
+      const res = await fetch(`http://localhost:5000/api/doctors/${docId}/availability?date=${dateStr}`);
+      const data = await res.json();
+      setAvailableSlots(data.filter(s => !s.isBooked));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const set = (f,v) => { setForm(p=>({...p,[f]:v})); setErrors(e=>({...e,[f]:''})); };
 
@@ -89,13 +112,18 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Date *</label>
-              <input type="date" className={`form-control ${errors.date?'border-danger':''}`} value={form.date} onChange={e=>set('date',e.target.value)}/>
+              <input type="date" className={`form-control ${errors.date?'border-danger':''}`} value={form.date} onChange={e=>set('date',e.target.value)} min={new Date().toISOString().split('T')[0]}/>
               {errors.date&&<p style={{color:'var(--accent-red)',fontSize:11.5,marginTop:3}}>{errors.date}</p>}
             </div>
             <div className="form-group">
-              <label className="form-label">Time *</label>
-              <input type="time" className={`form-control ${errors.time?'border-danger':''}`} value={form.time} onChange={e=>set('time',e.target.value)}/>
+              <label className="form-label">Time * {loadingSlots && <span style={{fontSize:11}}>(Loading...)</span>}</label>
+              <select className={`form-control ${errors.time?'border-danger':''}`} value={form.time} onChange={e=>set('time',e.target.value)} disabled={!form.doctorId || !form.date || loadingSlots}>
+                <option value="">— Select slot —</option>
+                {availableSlots.map(s => <option key={s.id} value={s.time}>{s.time}</option>)}
+              </select>
               {errors.time&&<p style={{color:'var(--accent-red)',fontSize:11.5,marginTop:3}}>{errors.time}</p>}
+              {(!form.doctorId || !form.date) && <p style={{color:'var(--text-muted)',fontSize:11,marginTop:3}}>Select doctor and date first</p>}
+              {(form.doctorId && form.date && !loadingSlots && availableSlots.length === 0) && <p style={{color:'var(--accent-red)',fontSize:11,marginTop:3}}>No free slots available</p>}
             </div>
           </div>
           <div className="grid-2">

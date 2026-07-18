@@ -17,6 +17,7 @@ import AlertsPage from './pages/AlertsPage';
 import SymptomLogsPage from './pages/SymptomLogsPage';
 import SettingsPage from './pages/SettingsPage';
 import LockPage from './pages/LockPage';
+import RescheduleRequestsPage from './pages/RescheduleRequestsPage';
 
 export default function App() {
   return (
@@ -47,6 +48,9 @@ export default function App() {
               {/* Staff only */}
               <Route path="doctors" element={
                 <ProtectedRoute role="staff"><DoctorListPage /></ProtectedRoute>
+              } />
+              <Route path="reschedules" element={
+                <ProtectedRoute role="staff"><RescheduleRequestsPage /></ProtectedRoute>
               } />
             </Route>
 

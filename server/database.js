@@ -234,6 +234,34 @@ async function initDatabase() {
       )
     `);
 
+    // Doctor Availability Table
+    await dbHelpers.run(`
+      CREATE TABLE IF NOT EXISTS doctor_availability (
+        id TEXT PRIMARY KEY,
+        doctorId TEXT,
+        date TEXT,
+        time TEXT,
+        FOREIGN KEY (doctorId) REFERENCES doctors(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Reschedule Requests Table
+    await dbHelpers.run(`
+      CREATE TABLE IF NOT EXISTS reschedule_requests (
+        id TEXT PRIMARY KEY,
+        appointmentId TEXT,
+        patientId TEXT,
+        doctorId TEXT,
+        requestedDate TEXT,
+        requestedTime TEXT,
+        status TEXT,
+        createdAt TEXT,
+        FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE CASCADE,
+        FOREIGN KEY (patientId) REFERENCES patients(id),
+        FOREIGN KEY (doctorId) REFERENCES doctors(id)
+      )
+    `);
+
     // Check if seed needed
     const staffCountResult = await dbHelpers.get('SELECT COUNT(*) as count FROM staff');
     const count = parseInt(staffCountResult.count, 10);
