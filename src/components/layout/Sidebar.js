@@ -5,7 +5,7 @@ import { useData } from '../../context/DataContext';
 import {
   LayoutDashboard, Users, UserCheck, Calendar, Stethoscope,
   Bell, Activity, Settings, LogOut, ChevronLeft, ChevronRight,
-  HeartPulse
+  HeartPulse, Clock
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/my-patients', label: 'My Patients',            icon: UserCheck,       roles: ['doctor'] },
   { path: '/appointments',label: 'Appointments',           icon: Calendar,        roles: ['staff','doctor'] },
   { path: '/doctors',     label: 'Doctor List',            icon: Stethoscope,     roles: ['staff'] },
+  { path: '/reschedules', label: 'Reschedule Requests',    icon: Clock,           roles: ['staff'] },
   { path: '/alerts',      label: 'Alerts & Notifications', icon: Bell,            roles: ['staff','doctor'] },
   { path: '/symptoms',    label: 'Symptom Logs',           icon: Activity,        roles: ['staff','doctor'] },
   { path: '/settings',    label: 'Settings',               icon: Settings,        roles: ['staff','doctor'] },

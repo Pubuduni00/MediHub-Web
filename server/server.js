@@ -247,9 +247,9 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { firebase_uid, appointment_id, note } = req.body;
-    if (!firebase_uid || !appointment_id) {
-      return res.status(400).json({ error: 'firebase_uid and appointment_id required' });
+    const { firebase_uid, appointment_id, requestedDate, requestedTime, note } = req.body;
+    if (!firebase_uid || !appointment_id || !requestedDate || !requestedTime) {
+      return res.status(400).json({ error: 'firebase_uid, appointment_id, requestedDate, requestedTime required' });
     }
 
     const patient = await dbHelpers.get(
@@ -257,14 +257,33 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
     );
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    // Create alert for doctor
+    const appointment = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [appointment_id]);
+    if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
+    
+    // Validation: Reschedule requests are only allowed up to the day before the appointment
+    const apptDate = new Date(appointment.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    apptDate.setHours(0, 0, 0, 0);
+
+    if (apptDate <= today) {
+      return res.status(400).json({ error: 'Cannot reschedule on or after the day of the appointment' });
+    }
+
+    const requestId = await generateNextId('reschedule_requests', 'RR');
+    await dbHelpers.run(
+      'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [requestId, appointment.id, patient.id, appointment.doctorId, requestedDate, requestedTime, 'Pending', new Date().toISOString()]
+    );
+
+    // Create alert for staff
     const alertId = await generateNextId('alerts', 'AL');
     await dbHelpers.run(
       'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-      [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule. Reason: ${note || 'Not specified'}`, 'warning', new Date().toISOString()]
+      [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule to ${requestedDate} ${requestedTime}. Reason: ${note || 'Not specified'}`, 'warning', new Date().toISOString()]
     );
 
-    return res.json({ success: true });
+    return res.json({ success: true, requestId });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -423,6 +442,70 @@ app.post('/api/doctors', async (req, res) => {
   }
 });
 
+// GET Doctor Availability (Free slots)
+app.get('/api/doctors/:id/availability', async (req, res) => {
+  try {
+    const { date } = req.query; // optional date filter
+    const doctorId = req.params.id;
+    
+    let query = 'SELECT * FROM doctor_availability WHERE doctorId = ?';
+    let params = [doctorId];
+    
+    if (date) {
+      query += ' AND date = ?';
+      params.push(date);
+    }
+    
+    const slots = await dbHelpers.all(query, params);
+    
+    // Check if slots are booked
+    // A slot is booked if there's a non-cancelled appointment at the same date and time
+    const appointments = await dbHelpers.all(
+      "SELECT date, time FROM appointments WHERE doctorId = ? AND status != 'Cancelled'",
+      [doctorId]
+    );
+    
+    const bookedSet = new Set(appointments.map(a => `${a.date}_${a.time}`));
+    
+    const result = slots.map(slot => ({
+      ...slot,
+      isBooked: bookedSet.has(`${slot.date}_${slot.time}`)
+    }));
+    
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// SET Doctor Availability Slots
+app.post('/api/doctors/:id/availability', async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const { date, slots } = req.body; // slots = array of times e.g. ["09:00", "09:15"]
+    
+    if (!date || !Array.isArray(slots)) {
+      return res.status(400).json({ error: 'date and slots array required' });
+    }
+    
+    // Delete existing slots for this date
+    await dbHelpers.run('DELETE FROM doctor_availability WHERE doctorId = ? AND date = ?', [doctorId, date]);
+    
+    // Insert new slots
+    for (const time of slots) {
+      const id = await generateNextId('doctor_availability', 'DA');
+      await dbHelpers.run(
+        'INSERT INTO doctor_availability (id, doctorId, date, time) VALUES (?, ?, ?, ?)',
+        [id, doctorId, date, time]
+      );
+    }
+    
+    res.json({ success: true, date, slots });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // â”€â”€ Appointments Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.get('/api/appointments', async (req, res) => {
@@ -523,6 +606,65 @@ app.put('/api/appointments/:id', async (req, res) => {
 
     updated.investigations = updated.investigations ? JSON.parse(updated.investigations) : [];
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// —— Reschedule Requests Endpoints ——
+
+app.get('/api/reschedule-requests', async (req, res) => {
+  try {
+    const requests = await dbHelpers.all(`
+      SELECT r.*, a.date as oldDate, a.time as oldTime, a.patientName, a.doctorName 
+      FROM reschedule_requests r
+      JOIN appointments a ON r.appointmentId = a.id
+    `);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/reschedule-requests/:id', async (req, res) => {
+  const { status } = req.body; // 'Approved' or 'Rejected'
+  if (!['Approved', 'Rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  try {
+    const request = await dbHelpers.get('SELECT * FROM reschedule_requests WHERE id = ?', [req.params.id]);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    
+    await dbHelpers.run('UPDATE reschedule_requests SET status = ? WHERE id = ?', [status, req.params.id]);
+    
+    if (status === 'Approved') {
+      // Update appointment
+      await dbHelpers.run(
+        'UPDATE appointments SET date = ?, time = ? WHERE id = ?',
+        [request.requestedDate, request.requestedTime, request.appointmentId]
+      );
+      
+      const appt = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [request.appointmentId]);
+      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [request.patientId]);
+      
+      // Sync to Firestore
+      if (patient && patient.firebaseUid) {
+        const apptDateTime = new Date(`${request.requestedDate}T${request.requestedTime}`).getTime();
+        await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
+          dateTime: apptDateTime,
+          rescheduleStatus: 'approved'
+        });
+      }
+    } else if (status === 'Rejected') {
+      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [request.patientId]);
+      if (patient && patient.firebaseUid) {
+        await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
+          rescheduleStatus: 'rejected'
+        });
+      }
+    }
+    
+    res.json({ success: true, status });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
