@@ -23,6 +23,8 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const [drugs, setDrugs]                   = useState([{ ...EMPTY_DRUG }]);
   const [investigations, setInvestigations] = useState([{ ...EMPTY_INVEST }]);
   const [exam, setExam]                     = useState({ ...EMPTY_EXAM });
+  const [nextSessionInvestigations, setNextSessionInvestigations] = useState('');
+  const [nextSessionNotes, setNextSessionNotes]                   = useState('');
   const [activeTab, setActiveTab]           = useState('exam');
   const [saved, setSaved]                   = useState(false);
 
@@ -37,7 +39,20 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const removeInvest  = (i) => setInvestigations(d => d.filter((_,idx) => idx!==i));
 
   const handleSave = async () => {
-    await addPatientLog({ patientId, doctorId:user?.id, doctorName:user?.name, examination:exam, drugs, investigations });
+    const nextSessionInvs = nextSessionInvestigations
+      ? nextSessionInvestigations.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    await addPatientLog({
+      patientId,
+      doctorId: user?.id,
+      doctorName: user?.name,
+      examination: exam,
+      drugs,
+      investigations,
+      nextSessionInvestigations: nextSessionInvs,
+      nextSessionNotes: nextSessionNotes || null,
+      activeAppointmentId: sessionStorage.getItem('activeAppointmentId')
+    });
     setSaved(true);
   };
 
@@ -46,6 +61,8 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
     setDrugs([{...EMPTY_DRUG}]);
     setInvestigations([{...EMPTY_INVEST}]);
     setExam({...EMPTY_EXAM});
+    setNextSessionInvestigations('');
+    setNextSessionNotes('');
     setActiveTab('exam');
     onClose();
   };
@@ -280,6 +297,30 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div style={{ marginTop: 24 }}>
+                <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--text-muted)', margin:'16px 0 10px', paddingBottom:6, borderBottom:'1px solid var(--border)' }}>
+                  Next Session Requirements
+                </p>
+                <div style={{ background:'var(--bg-base)', borderRadius:'var(--radius-md)', padding:'14px 16px', border:'1px solid var(--border)' }}>
+                  <p style={{ fontSize:13, fontWeight:700, color:'var(--primary)', marginBottom:12 }}>Reports to Bring to Next Session</p>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize:12 }}>Investigation Reports (comma-separated, e.g. FBC, ECG, Blood Report)</label>
+                    <input className="form-control" style={{ fontSize:13 }}
+                      value={nextSessionInvestigations}
+                      onChange={e=>setNextSessionInvestigations(e.target.value)}
+                      placeholder="e.g. FBC, ECG, Lipid Profile"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin:0 }}>
+                    <label className="form-label" style={{ fontSize:12 }}>Instructions / Notes for Next Session</label>
+                    <textarea className="form-control" rows={2} style={{ fontSize:13 }}
+                      value={nextSessionNotes}
+                      onChange={e=>setNextSessionNotes(e.target.value)}
+                      placeholder="e.g. Please bring original reports. Fasting required for blood test."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}

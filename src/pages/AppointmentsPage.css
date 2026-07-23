@@ -72,6 +72,10 @@
   background: var(--accent-red-light);
   color: var(--accent-red);
 }
+.appts-status-pill.missed {
+  background: var(--accent-red-light);
+  color: var(--accent-red);
+}
 
 /* Edit button */
 .appts-edit-btn {

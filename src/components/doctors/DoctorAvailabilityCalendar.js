@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { X, Check, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [saving, setSaving] = useState(false);
@@ -121,7 +127,10 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
             <input 
               type="date"
               value={format(selectedDate, 'yyyy-MM-dd')}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) setSelectedDate(parseLocalDate(val));
+              }}
               min={format(new Date(), 'yyyy-MM-dd')}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none', fontSize: '15px' }}
             />
