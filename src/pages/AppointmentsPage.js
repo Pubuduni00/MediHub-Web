@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isPast, isToday } from 'date-fns';
-import { Download, Plus, Edit2, Search, ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react';
+import { Download, Plus, Edit2, Search, ChevronLeft, ChevronRight, Calendar, Clock, Play } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
@@ -20,6 +21,7 @@ const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 export default function AppointmentsPage() {
   const { appointments } = useData();
   const { isDoctor, user } = useAuth();
+  const navigate = useNavigate();
   const [showAdd, setShowAdd]           = useState(false);
   const [editAppt, setEditAppt]         = useState(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(),'yyyy-MM-dd'));
@@ -27,6 +29,12 @@ export default function AppointmentsPage() {
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [showAvailability, setShowAvailability] = useState(false);
+
+  const startSession = (appt) => {
+    sessionStorage.setItem('activeAppointmentId', appt.id);
+    sessionStorage.setItem('activePatientId', appt.patientId);
+    navigate(`/patients/${appt.patientId}`);
+  };
 
   const calDays = eachDayOfInterval({
     start: startOfWeek(startOfMonth(calMonth)),
@@ -57,7 +65,7 @@ export default function AppointmentsPage() {
   const displayDate = selectedDate ? format(parseISO(selectedDate),'EEEE, dd MMMM yyyy') : '';
 
   const StatusPill = ({ status }) => {
-    const cls = status==='Confirmed' ? 'confirmed' : status==='Pending' ? 'pending' : 'cancelled';
+    const cls = status==='Confirmed' ? 'confirmed' : status==='Pending' ? 'pending' : status==='Missed' ? 'missed' : 'cancelled';
     return (
       <span className={`appts-status-pill ${cls}`}>
         <span style={{ width:6, height:6, borderRadius:'50%', background:'currentColor', flexShrink:0 }}/>
@@ -137,6 +145,7 @@ export default function AppointmentsPage() {
                     <th>Dur.</th>
                     <th>Status</th>
                     <th></th>
+                    {isDoctor && <th></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -174,6 +183,25 @@ export default function AppointmentsPage() {
                           <Edit2 size={12}/>
                         </button>
                       </td>
+                      {isDoctor && (
+                        <td style={{ width:70 }}>
+                          {a.status !== 'Completed' && a.status !== 'Cancelled' && a.status !== 'Missed' && a.date === format(new Date(), 'yyyy-MM-dd') && (
+                            <button
+                              onClick={() => startSession(a)}
+                              title="Start appointment session"
+                              style={{
+                                display:'flex', alignItems:'center', gap:4,
+                                background:'var(--accent-green)', color:'#fff',
+                                border:'none', borderRadius:6, padding:'4px 9px',
+                                fontSize:11.5, fontWeight:700, cursor:'pointer',
+                                whiteSpace:'nowrap'
+                              }}
+                            >
+                              <Play size={10} fill="currentColor"/> Start
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

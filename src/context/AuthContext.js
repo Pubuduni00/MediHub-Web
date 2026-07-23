@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
       
       if (!res.ok) {
         const errData = await res.json();
-        return { success: false, error: errData.error || 'Google login failed' };
+        return { success: false, error: errData.error || 'Google login failed', message: errData.message || null };
       }
       
       const doctorData = await res.json();

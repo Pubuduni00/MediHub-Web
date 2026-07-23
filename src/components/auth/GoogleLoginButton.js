@@ -22,7 +22,7 @@ export default function GoogleLoginButton() {
         // profile contains: name, email, picture, sub
         const result = await loginDoctor(profile);
         if (result.success) navigate('/dashboard');
-        else setError(result.error || 'Your Google account is not registered as a doctor.');
+        else setError(result.message || result.error || 'Your Google account is not registered as a doctor.');
       } catch {
         setError('Google login failed. Please try again.');
       } finally {

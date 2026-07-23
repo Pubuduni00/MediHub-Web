@@ -66,6 +66,50 @@ async function syncAppointmentToFirestore(firebaseUid, apptId, apptData) {
   }
 }
 
+// Helper: get today's date as YYYY-MM-DD in local time (avoids UTC offset issues)
+function getLocalDateString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Helper: auto-mark past appointments that were never completed as 'Missed'
+async function checkAndMarkMissedAppointments() {
+  try {
+    const todayStr = getLocalDateString();
+    const missedAppts = await dbHelpers.all(
+      "SELECT * FROM appointments WHERE date < ? AND status NOT IN ('Completed', 'Cancelled', 'Missed')",
+      [todayStr]
+    );
+    for (const appt of missedAppts) {
+      console.log(`Marking appointment ${appt.id} as Missed`);
+      await dbHelpers.run(
+        "UPDATE appointments SET status = 'Missed' WHERE id = ?",
+        [appt.id]
+      );
+      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [appt.patientId]);
+      if (patient && patient.firebaseUid) {
+        const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+        const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
+        await syncAppointmentToFirestore(patient.firebaseUid, appt.id, {
+          dateTime: apptDateTime,
+          clinic: appt.details || appt.type || 'Clinic',
+          doctorName: appt.doctorName,
+          requestDetails: appt.details || '',
+          status: 'missed',
+          rescheduleStatus: 'none',
+          investigations: investigations,
+          investigationNotes: appt.investigationNotes || null,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error checking/marking missed appointments:', err.message);
+  }
+}
+
 // â”€â”€ ID Generator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function generateNextId(tableName, prefix) {
   try {
@@ -84,7 +128,7 @@ async function generateNextId(tableName, prefix) {
   }
 }
 
-// â”€â”€ Auth Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Auth Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Staff Login
 app.post('/api/auth/staff-login', async (req, res) => {
@@ -115,13 +159,12 @@ app.post('/api/auth/doctor-login', async (req, res) => {
       [email.toLowerCase()]
     );
     if (!doctor) {
-      const id = await generateNextId('doctors', 'DR');
-      await dbHelpers.run(
-        'INSERT INTO doctors (id, name, email, specialty, department, phone, qualification, joinDate, status, schedule, role, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name || 'Doctor', email.toLowerCase(), 'General Medicine', 'General Medicine', '', 'MBBS', new Date().toISOString().split('T')[0], 'Active', 'Mon-Fri, 9AM-5PM', 'doctor', picture || null]
-      );
-      doctor = await dbHelpers.get('SELECT * FROM doctors WHERE id = ?', [id]);
-    } else if (picture && doctor.avatar !== picture) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Your email is not registered in the MediHub system. Please contact the staff portal administrator to register your account.'
+      });
+    }
+    if (picture && doctor.avatar !== picture) {
       await dbHelpers.run('UPDATE doctors SET avatar = ? WHERE id = ?', [picture, doctor.id]);
       doctor.avatar = picture;
     }
@@ -510,6 +553,7 @@ app.post('/api/doctors/:id/availability', async (req, res) => {
 
 app.get('/api/appointments', async (req, res) => {
   try {
+    await checkAndMarkMissedAppointments();
     const appointments = await dbHelpers.all('SELECT * FROM appointments');
     const parsed = appointments.map(a => ({
       ...a,
@@ -598,6 +642,7 @@ app.put('/api/appointments/:id', async (req, res) => {
         status: (updated.status || '').toLowerCase() === 'confirmed' ? 'upcoming'
                : (updated.status || '').toLowerCase() === 'completed' ? 'completed'
                : (updated.status || '').toLowerCase() === 'cancelled' ? 'missed'
+               : (updated.status || '').toLowerCase() === 'missed' ? 'missed'
                : 'upcoming',
         investigations: investigations || (existing.investigations ? JSON.parse(existing.investigations) : []),
         investigationNotes: investigationNotes || existing.investigationNotes || null,
@@ -670,7 +715,7 @@ app.put('/api/reschedule-requests/:id', async (req, res) => {
   }
 });
 
-// â”€â”€ Patient Logs Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ——— Patient Logs Endpoints ——————————————————————————————————————————————————————
 
 app.get('/api/patient-logs', async (req, res) => {
   try {
@@ -688,11 +733,11 @@ app.get('/api/patient-logs', async (req, res) => {
 });
 
 app.post('/api/patient-logs', async (req, res) => {
-  const { patientId, doctorId, doctorName, examination, drugs, investigations } = req.body;
+  const { patientId, doctorId, doctorName, examination, drugs, investigations, nextSessionInvestigations, nextSessionNotes, activeAppointmentId } = req.body;
   if (!patientId || !doctorId) return res.status(400).json({ error: 'patientId and doctorId required' });
   try {
     const id = await generateNextId('patient_logs', 'LOG');
-    const date = new Date().toISOString().split('T')[0];
+    const date = getLocalDateString();
     const examStr = JSON.stringify(examination || {});
     const drugsStr = JSON.stringify(drugs || []);
     const invStr = JSON.stringify(investigations || []);
@@ -701,6 +746,41 @@ app.post('/api/patient-logs', async (req, res) => {
       'INSERT INTO patient_logs (id, patientId, doctorId, doctorName, date, examination, drugs, investigations) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [id, patientId, doctorId, doctorName, date, examStr, drugsStr, invStr]
     );
+
+    // If next session investigations are specified, copy them to the next upcoming appointment
+    if (nextSessionInvestigations && nextSessionInvestigations.length > 0) {
+      const nextAppt = await dbHelpers.get(
+        "SELECT * FROM appointments WHERE patientId = ? AND id != ? AND date >= ? AND status NOT IN ('Completed', 'Cancelled', 'Missed') ORDER BY date ASC, time ASC LIMIT 1",
+        [patientId, activeAppointmentId || '', date]
+      );
+      if (nextAppt) {
+        console.log(`Attaching next session investigations to appointment ${nextAppt.id}`);
+        const invsJson = JSON.stringify(nextSessionInvestigations);
+        await dbHelpers.run(
+          "UPDATE appointments SET investigations = ?, investigationNotes = ? WHERE id = ?",
+          [invsJson, nextSessionNotes || null, nextAppt.id]
+        );
+        // Sync the updated appointment to Firestore immediately
+        const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
+        if (patient && patient.firebaseUid) {
+          const apptDateTime = new Date(`${nextAppt.date}T${nextAppt.time}`).getTime();
+          await syncAppointmentToFirestore(patient.firebaseUid, nextAppt.id, {
+            dateTime: apptDateTime,
+            clinic: nextAppt.details || nextAppt.type || 'Clinic',
+            doctorName: nextAppt.doctorName,
+            requestDetails: nextAppt.details || '',
+            status: nextAppt.status === 'Confirmed' ? 'upcoming'
+                   : nextAppt.status === 'Completed' ? 'completed'
+                   : nextAppt.status === 'Cancelled' ? 'missed'
+                   : nextAppt.status === 'Missed' ? 'missed'
+                   : 'upcoming',
+            rescheduleStatus: 'none',
+            investigations: nextSessionInvestigations,
+            investigationNotes: nextSessionNotes || null,
+          });
+        }
+      }
+    }
 
     // â”€â”€ Sync medications to Firestore when doctor adds drugs in log â”€â”€
     if (drugs && drugs.length > 0) {
@@ -1037,6 +1117,7 @@ initDatabase()
     app.listen(PORT, () => {
       console.log(`MediHub server running on port ${PORT}`);
       console.log(`Firebase sync: ${db_firebase ? 'ENABLED' : 'DISABLED (add serviceAccountKey.json)'}`);
+      checkAndMarkMissedAppointments();
     });
   })
   .catch((err) => {
