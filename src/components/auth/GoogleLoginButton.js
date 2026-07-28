@@ -20,7 +20,14 @@ export default function GoogleLoginButton() {
         });
         const profile = await res.json();
         // profile contains: name, email, picture, sub
-        const result = await loginDoctor(profile);
+
+        // Pass idToken (credential) if available for server-side verification
+        // tokenResponse.credential is set when using OAuth 2.0 implicit flow
+        const result = await loginDoctor({
+          ...profile,
+          idToken: tokenResponse.credential || null
+        });
+
         if (result.success) navigate('/dashboard');
         else setError(result.message || result.error || 'Your Google account is not registered as a doctor.');
       } catch {

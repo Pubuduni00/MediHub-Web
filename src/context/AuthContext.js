@@ -49,7 +49,8 @@ export const AuthProvider = ({ children }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: googleProfile.email,
+          idToken: googleProfile.idToken || null,   // Firebase-verifiable ID token (preferred)
+          email: googleProfile.email,               // Fallback email (used if idToken absent)
           name: googleProfile.name,
           picture: googleProfile.picture
         })

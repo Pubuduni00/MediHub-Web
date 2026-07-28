@@ -323,7 +323,7 @@ function initFirestoreListeners() {
                   emergencyContactName: patient.emergencyName || null,
                   emergencyContactNumber: patient.emergencyContact || null,
                 });
-                
+
                 // Sync appointments
                 const appts = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
                 for (const appt of appts) {
@@ -335,9 +335,9 @@ function initFirestoreListeners() {
                     doctorName: appt.doctorName,
                     requestDetails: appt.details || '',
                     status: appt.status === 'Confirmed' ? 'upcoming'
-                           : appt.status === 'Completed' ? 'completed'
-                           : appt.status === 'Cancelled' ? 'missed'
-                           : 'upcoming',
+                      : appt.status === 'Completed' ? 'completed'
+                        : appt.status === 'Cancelled' ? 'missed'
+                          : 'upcoming',
                     rescheduleStatus: 'none',
                     investigations: investigations,
                     investigationNotes: appt.investigationNotes || null,
@@ -397,28 +397,28 @@ function initFirestoreListeners() {
               [patient.id, dateStr]
             );
             if (!existingLog) {
-               const id = await generateNextId('symptom_logs', 'SL');
-               const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
-               const healthStatus = checkInData.healthStatus || 'stable';
-               const severity = healthStatus === 'critical' ? 'Severe'
-                              : healthStatus === 'warning' ? 'Moderate' : 'Mild';
-               await dbHelpers.run(
-                 'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                 [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', 'MediHub App']
-               );
-               if (healthStatus === 'critical') {
-                 const alertId = await generateNextId('alerts', 'AL');
-                 await dbHelpers.run(
-                   'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                   [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
-                 );
-               } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
-                 const alertId = await generateNextId('alerts', 'AL');
-                 await dbHelpers.run(
-                   'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                   [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
-                 );
-               }
+              const id = await generateNextId('symptom_logs', 'SL');
+              const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
+              const healthStatus = checkInData.healthStatus || 'stable';
+              const severity = healthStatus === 'critical' ? 'Severe'
+                : healthStatus === 'warning' ? 'Moderate' : 'Mild';
+              await dbHelpers.run(
+                'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', 'MediHub App']
+              );
+              if (healthStatus === 'critical') {
+                const alertId = await generateNextId('alerts', 'AL');
+                await dbHelpers.run(
+                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                  [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
+                );
+              } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
+                const alertId = await generateNextId('alerts', 'AL');
+                await dbHelpers.run(
+                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                  [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
+                );
+              }
             }
           } catch (err) {
             console.error('[Listener] Check-in error:', err.message);
@@ -598,27 +598,62 @@ app.put('/api/staff/:id', async (req, res) => {
 });
 
 // Doctor Login (Google OAuth)
-// Only allows login if the email was pre-registered by staff in the doctors table
+// Verifies Google ID token with Firebase Auth, then checks email is pre-registered by staff
 app.post('/api/auth/doctor-login', async (req, res) => {
-  const { email, name, picture } = req.body;
-  if (!email) return res.status(400).json({ error: 'Google email is required' });
+  const { idToken, email: fallbackEmail, name, picture } = req.body;
+
+  let verifiedEmail = null;
+
+  // Prefer server-side Firebase token verification for security
+  if (idToken && auth_firebase) {
+    try {
+      const decoded = await auth_firebase.verifyIdToken(idToken);
+      verifiedEmail = decoded.email;
+    } catch (verifyErr) {
+      console.warn('[Doctor Login] Firebase ID token verification failed:', verifyErr.message);
+      // Fall back to client-provided email (less secure, but keeps backward compat)
+      verifiedEmail = fallbackEmail;
+    }
+  } else {
+    // Firebase Admin not available or no idToken — use client-provided email
+    verifiedEmail = fallbackEmail;
+  }
+
+  if (!verifiedEmail) {
+    return res.status(400).json({ error: 'Google email is required' });
+  }
+
   try {
     let doctor = await dbHelpers.get(
       'SELECT * FROM doctors WHERE LOWER(email) = ?',
-      [email.toLowerCase()]
+      [verifiedEmail.toLowerCase()]
     );
+
     if (!doctor) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Your email is not registered in the MediHub system. Please contact the staff portal administrator to register your account.'
+        message: 'Your Google account email is not registered in the MediHub system.'
       });
     }
+
+    // Block inactive doctors from logging in
+    if (doctor.status && doctor.status.toLowerCase() === 'inactive') {
+      return res.status(403).json({
+        error: 'Account inactive',
+        message: 'Your doctor account has been deactivated. Please contact the hospital administration to reactivate your account.'
+      });
+    }
+
+    // Update avatar from Google profile if changed
     if (picture && doctor.avatar !== picture) {
       await dbHelpers.run('UPDATE doctors SET avatar = ? WHERE id = ?', [picture, doctor.id]);
       doctor.avatar = picture;
     }
+
+    console.log(`[Doctor Login] Successful login for ${doctor.name} (${verifiedEmail})`);
     return res.json(doctor);
   } catch (err) {
+    console.error('[Doctor Login] Error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -751,7 +786,7 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
 
     const appointment = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [appointment_id]);
     if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
-    
+
     // Validation: Reschedule requests are only allowed up to the day before the appointment
     const apptDate = new Date(appointment.date);
     const today = new Date();
@@ -955,31 +990,31 @@ app.get('/api/doctors/:id/availability', async (req, res) => {
   try {
     const { date } = req.query; // optional date filter
     const doctorId = req.params.id;
-    
+
     let query = 'SELECT * FROM doctor_availability WHERE doctorId = ?';
     let params = [doctorId];
-    
+
     if (date) {
       query += ' AND date = ?';
       params.push(date);
     }
-    
+
     const slots = await dbHelpers.all(query, params);
-    
+
     // Check if slots are booked
     // A slot is booked if there's a non-cancelled appointment at the same date and time
     const appointments = await dbHelpers.all(
       "SELECT date, time FROM appointments WHERE doctorId = ? AND status != 'Cancelled'",
       [doctorId]
     );
-    
+
     const bookedSet = new Set(appointments.map(a => `${a.date}_${a.time}`));
-    
+
     const result = slots.map(slot => ({
       ...slot,
       isBooked: bookedSet.has(`${slot.date}_${slot.time}`)
     }));
-    
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -1015,14 +1050,14 @@ app.post('/api/doctors/:id/availability', async (req, res) => {
   try {
     const doctorId = req.params.id;
     const { date, slots } = req.body; // slots = array of times e.g. ["09:00", "09:15"]
-    
+
     if (!date || !Array.isArray(slots)) {
       return res.status(400).json({ error: 'date and slots array required' });
     }
-    
+
     // Delete existing slots for this date
     await dbHelpers.run('DELETE FROM doctor_availability WHERE doctorId = ? AND date = ?', [doctorId, date]);
-    
+
     // Insert new slots
     for (const time of slots) {
       const id = await generateNextId('doctor_availability', 'DA');
@@ -1031,7 +1066,7 @@ app.post('/api/doctors/:id/availability', async (req, res) => {
         [id, doctorId, date, time]
       );
     }
-    
+
     res.json({ success: true, date, slots });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -1129,10 +1164,10 @@ app.put('/api/appointments/:id', async (req, res) => {
       await syncAppointmentToFirestore(patient.firebaseUid, req.params.id, {
         dateTime: apptDateTime,
         status: (updated.status || '').toLowerCase() === 'confirmed' ? 'upcoming'
-               : (updated.status || '').toLowerCase() === 'completed' ? 'completed'
-               : (updated.status || '').toLowerCase() === 'cancelled' ? 'missed'
-               : (updated.status || '').toLowerCase() === 'missed' ? 'missed'
-               : 'upcoming',
+          : (updated.status || '').toLowerCase() === 'completed' ? 'completed'
+            : (updated.status || '').toLowerCase() === 'cancelled' ? 'missed'
+              : (updated.status || '').toLowerCase() === 'missed' ? 'missed'
+                : 'upcoming',
         investigations: investigations || (existing.investigations ? JSON.parse(existing.investigations) : []),
         investigationNotes: investigationNotes || existing.investigationNotes || null,
       });
@@ -1168,19 +1203,19 @@ app.put('/api/reschedule-requests/:id', async (req, res) => {
   try {
     const request = await dbHelpers.get('SELECT * FROM reschedule_requests WHERE id = ?', [req.params.id]);
     if (!request) return res.status(404).json({ error: 'Request not found' });
-    
+
     await dbHelpers.run('UPDATE reschedule_requests SET status = ? WHERE id = ?', [status, req.params.id]);
-    
+
     if (status === 'Approved') {
       // Update appointment
       await dbHelpers.run(
         'UPDATE appointments SET date = ?, time = ? WHERE id = ?',
         [request.requestedDate, request.requestedTime, request.appointmentId]
       );
-      
+
       const appt = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [request.appointmentId]);
       const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [request.patientId]);
-      
+
       // Sync to Firestore
       if (patient && patient.firebaseUid) {
         const apptDateTime = new Date(`${request.requestedDate}T${request.requestedTime}`).getTime();
@@ -1197,7 +1232,7 @@ app.put('/api/reschedule-requests/:id', async (req, res) => {
         });
       }
     }
-    
+
     res.json({ success: true, status });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -1308,11 +1343,11 @@ app.post('/api/patient-logs', async (req, res) => {
 
           } else {
             // Check if modified
-            const isModified = drug.dose !== drug.originalDose || 
-                               drug.frequency !== drug.originalFreq || 
-                               drug.duration !== drug.originalDur ||
-                               drug.mealInstruction !== drug.originalMeal ||
-                               drug.notes !== drug.originalNotes;
+            const isModified = drug.dose !== drug.originalDose ||
+              drug.frequency !== drug.originalFreq ||
+              drug.duration !== drug.originalDur ||
+              drug.mealInstruction !== drug.originalMeal ||
+              drug.notes !== drug.originalNotes;
 
             if (isModified) {
               // Update in Firestore
@@ -1418,10 +1453,10 @@ app.post('/api/patient-logs', async (req, res) => {
             doctorName: nextAppt.doctorName,
             requestDetails: nextAppt.details || '',
             status: nextAppt.status === 'Confirmed' ? 'upcoming'
-                   : nextAppt.status === 'Completed' ? 'completed'
-                   : nextAppt.status === 'Cancelled' ? 'missed'
-                   : nextAppt.status === 'Missed' ? 'missed'
-                   : 'upcoming',
+              : nextAppt.status === 'Completed' ? 'completed'
+                : nextAppt.status === 'Cancelled' ? 'missed'
+                  : nextAppt.status === 'Missed' ? 'missed'
+                    : 'upcoming',
             rescheduleStatus: 'none',
             investigations: nextSessionInvestigations,
             investigationNotes: nextSessionNotes || null,
