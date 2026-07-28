@@ -35,7 +35,7 @@ const SystemCard = ({ title, field, placeholder, color, exam, onChange }) => (
 );
 
 export default function PatientLogModal({ isOpen, onClose, patientId }) {
-  const { addPatientLog } = useData();
+  const { addPatientLog, prescriptions } = useData();
   const { user } = useAuth();
   const [drugs, setDrugs]                   = useState([{ ...EMPTY_DRUG }]);
   const [investigations, setInvestigations] = useState([{ ...EMPTY_INVEST }]);
@@ -44,6 +44,52 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const [nextSessionNotes, setNextSessionNotes]                   = useState('');
   const [activeTab, setActiveTab]           = useState('exam');
   const [saved, setSaved]                   = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      const active = [];
+      const patientRxs = prescriptions.filter(r => r.patientId === patientId);
+      patientRxs.forEach(rx => {
+        const drugsList = rx.drugs || [];
+        drugsList.forEach(d => {
+          if (d.changeType === 'Stopped' || d.endDate) {
+            const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
+            if (idx !== -1) {
+              active.splice(idx, 1);
+            }
+          } else {
+            const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
+            const mappedDrug = {
+              ...d,
+              logId: rx.logId || rx.id,
+              rxId: rx.id,
+              isExisting: true,
+              status: 'Continue',
+              originalDose: d.dose || '',
+              originalFreq: d.frequency || 'Once daily',
+              originalDur: d.duration || '',
+              originalMeal: d.mealInstruction || 'After meals',
+              originalNotes: d.notes || '',
+            };
+            if (idx === -1) {
+              active.push(mappedDrug);
+            } else {
+              active[idx] = mappedDrug;
+            }
+          }
+        });
+      });
+
+      if (active.length === 0) {
+        setDrugs([{ ...EMPTY_DRUG }]);
+      } else {
+        setDrugs([...active]);
+      }
+    } else {
+      setDrugs([{ ...EMPTY_DRUG }]);
+    }
+  }, [isOpen, patientId, prescriptions]);
+
 
   const setE = (f,v) => setExam(e => ({ ...e, [f]:v }));
 
@@ -213,7 +259,7 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                 <table style={{ width:'100%', borderCollapse:'collapse' }}>
                   <thead>
                     <tr style={{ background:'var(--bg-base)' }}>
-                      {['#','Drug Name','Dose','Frequency','Duration','Meal Instruction','Notes',''].map((h,i)=>(
+                      {['#','Drug Name','Dose','Frequency','Duration','Meal Instruction','Notes','Action / Status'].map((h,i)=>(
                         <th key={i} style={{ padding:'9px 10px', textAlign:'left', fontSize:12, fontWeight:700, color:'var(--text-secondary)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -223,7 +269,11 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                       <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
                         <td style={{ padding:'8px 10px', fontSize:13, color:'var(--text-muted)', width:28 }}>{i+1}</td>
                         <td style={{ padding:'6px 6px', minWidth:130 }}>
-                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.drug} onChange={e=>updateDrug(i,'drug',e.target.value)} placeholder="e.g. Amlodipine"/>
+                          {d.isExisting ? (
+                            <input className="form-control" style={{ padding:'5px 8px', fontSize:13, fontWeight:600, background:'var(--bg-muted)' }} value={d.drug} disabled />
+                          ) : (
+                            <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.drug} onChange={e=>updateDrug(i,'drug',e.target.value)} placeholder="e.g. Amlodipine"/>
+                          )}
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:80 }}>
                           <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.dose} onChange={e=>updateDrug(i,'dose',e.target.value)} placeholder="e.g. 5mg"/>
@@ -244,11 +294,31 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                         <td style={{ padding:'6px 6px', minWidth:120 }}>
                           <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.notes} onChange={e=>updateDrug(i,'notes',e.target.value)} placeholder="Special instructions..."/>
                         </td>
-                        <td style={{ padding:'6px 8px', width:32 }}>
-                          {drugs.length>1 && (
-                            <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>removeDrug(i)} style={{ color:'var(--accent-red)', padding:4 }}>
-                              <Trash2 size={14}/>
-                            </button>
+                        <td style={{ padding:'6px 8px', minWidth:120 }}>
+                          {d.isExisting ? (
+                            <select 
+                              className="form-control" 
+                              style={{ 
+                                padding:'5px 8px', 
+                                fontSize:12, 
+                                fontWeight:700, 
+                                color: d.status === 'Stop' ? 'var(--accent-red)' : 'var(--accent-green)',
+                                background: d.status === 'Stop' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                                border: d.status === 'Stop' ? '1px solid var(--accent-red)' : '1px solid var(--accent-green)'
+                              }}
+                              value={d.status} 
+                              onChange={e=>updateDrug(i,'status',e.target.value)}
+                            >
+                              <option value="Continue" style={{ color:'var(--accent-green)' }}>Continue</option>
+                              <option value="Stop" style={{ color:'var(--accent-red)' }}>Stop</option>
+                            </select>
+                          ) : (
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <span className="badge badge-secondary" style={{ fontSize:10, background:'var(--primary-light)', color:'var(--primary)' }}>New</span>
+                              <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>removeDrug(i)} style={{ color:'var(--accent-red)', padding:4 }}>
+                                <Trash2 size={14}/>
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
