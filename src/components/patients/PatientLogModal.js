@@ -45,48 +45,54 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const [activeTab, setActiveTab]           = useState('exam');
   const [saved, setSaved]                   = useState(false);
 
+  const hasInitializedRef = React.useRef(false);
+
   React.useEffect(() => {
     if (isOpen) {
-      const active = [];
-      const patientRxs = prescriptions.filter(r => r.patientId === patientId);
-      patientRxs.forEach(rx => {
-        const drugsList = rx.drugs || [];
-        drugsList.forEach(d => {
-          if (d.changeType === 'Stopped' || d.endDate) {
-            const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
-            if (idx !== -1) {
-              active.splice(idx, 1);
-            }
-          } else {
-            const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
-            const mappedDrug = {
-              ...d,
-              logId: rx.logId || rx.id,
-              rxId: rx.id,
-              isExisting: true,
-              status: 'Continue',
-              originalDose: d.dose || '',
-              originalFreq: d.frequency || 'Once daily',
-              originalDur: d.duration || '',
-              originalMeal: d.mealInstruction || 'After meals',
-              originalNotes: d.notes || '',
-            };
-            if (idx === -1) {
-              active.push(mappedDrug);
+      if (!hasInitializedRef.current) {
+        const active = [];
+        const patientRxs = prescriptions.filter(r => r.patientId === patientId);
+        patientRxs.forEach(rx => {
+          const drugsList = rx.drugs || [];
+          drugsList.forEach(d => {
+            if (d.changeType === 'Stopped' || d.endDate) {
+              const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
+              if (idx !== -1) {
+                active.splice(idx, 1);
+              }
             } else {
-              active[idx] = mappedDrug;
+              const idx = active.findIndex(ad => ad.drug.toLowerCase() === d.drug.toLowerCase());
+              const mappedDrug = {
+                ...d,
+                logId: rx.logId || rx.id,
+                rxId: rx.id,
+                isExisting: true,
+                status: 'Continue',
+                originalDose: d.dose || '',
+                originalFreq: d.frequency || 'Once daily',
+                originalDur: d.duration || '',
+                originalMeal: d.mealInstruction || 'After meals',
+                originalNotes: d.notes || '',
+              };
+              if (idx === -1) {
+                active.push(mappedDrug);
+              } else {
+                active[idx] = mappedDrug;
+              }
             }
-          }
+          });
         });
-      });
 
-      if (active.length === 0) {
-        setDrugs([{ ...EMPTY_DRUG }]);
-      } else {
-        setDrugs([...active]);
+        if (active.length === 0) {
+          setDrugs([{ ...EMPTY_DRUG }]);
+        } else {
+          setDrugs([...active]);
+        }
+        hasInitializedRef.current = true;
       }
     } else {
       setDrugs([{ ...EMPTY_DRUG }]);
+      hasInitializedRef.current = false;
     }
   }, [isOpen, patientId, prescriptions]);
 
