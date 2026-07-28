@@ -42,3 +42,13 @@
 @media (max-width: 1050px) {
   .profile-layout { grid-template-columns: 1fr; }
 }
+
+.clickable-log-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.clickable-log-item:hover {
+  background: var(--primary-light) !important;
+  border-color: var(--primary) !important;
+  transform: translateY(-1px);
+}
