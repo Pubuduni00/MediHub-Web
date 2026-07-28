@@ -17,13 +17,20 @@ export default function PatientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isDoctor } = useAuth();
-  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs, appointments } = useData();
+  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs, appointments, refreshData } = useData();
 
   const patient = getPatientById(id);
   const [showLog,     setShowLog]     = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAppt,    setShowAppt]    = useState(false);
   const [showEditPatient, setShowEditPatient] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      refreshData();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [refreshData]);
 
   // Detect active session for this patient
   const activeApptId  = sessionStorage.getItem('activeAppointmentId');
@@ -149,6 +156,8 @@ export default function PatientProfilePage() {
               { icon:Mail,   label:'Email',         val:patient.email||'N/A' },
               { icon:MapPin, label:'Address',       val:patient.address||'N/A' },
               { icon:User,   label:'NIC',           val:patient.nic||'N/A' },
+              { icon:User,   label:'Emergency Name', val:patient.emergencyName||'N/A' },
+              { icon:Phone,  label:'Emergency Contact', val:patient.emergencyContact||'N/A' },
             ].map((item,i)=>(
               <div key={i} className="info-row">
                 <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:110 }}>

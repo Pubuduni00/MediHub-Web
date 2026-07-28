@@ -14,34 +14,38 @@ export const DataProvider = ({ children }) => {
   const [symptomLogs, setSymptomLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const refreshData = async () => {
+    try {
+      const [patientsRes, doctorsRes, apptsRes, logsRes, rxRes, alertsRes, symptomsRes] = await Promise.all([
+        fetch(`${API_URL}/patients`),
+        fetch(`${API_URL}/doctors`),
+        fetch(`${API_URL}/appointments`),
+        fetch(`${API_URL}/patient-logs`),
+        fetch(`${API_URL}/prescriptions`),
+        fetch(`${API_URL}/alerts`),
+        fetch(`${API_URL}/symptom-logs`)
+      ]);
+
+      if (patientsRes.ok) setPatients(await patientsRes.json());
+      if (doctorsRes.ok) setDoctors(await doctorsRes.json());
+      if (apptsRes.ok) setAppointments(await apptsRes.json());
+      if (logsRes.ok) setPatientLogs(await logsRes.json());
+      if (rxRes.ok) setPrescriptions(await rxRes.json());
+      if (alertsRes.ok) setAlerts(await alertsRes.json());
+      if (symptomsRes.ok) setSymptomLogs(await symptomsRes.json());
+    } catch (err) {
+      console.error("Error refreshing data from API:", err);
+    }
+  };
+
   // Fetch all data on mount
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [patientsRes, doctorsRes, apptsRes, logsRes, rxRes, alertsRes, symptomsRes] = await Promise.all([
-          fetch(`${API_URL}/patients`),
-          fetch(`${API_URL}/doctors`),
-          fetch(`${API_URL}/appointments`),
-          fetch(`${API_URL}/patient-logs`),
-          fetch(`${API_URL}/prescriptions`),
-          fetch(`${API_URL}/alerts`),
-          fetch(`${API_URL}/symptom-logs`)
-        ]);
-
-        if (patientsRes.ok) setPatients(await patientsRes.json());
-        if (doctorsRes.ok) setDoctors(await doctorsRes.json());
-        if (apptsRes.ok) setAppointments(await apptsRes.json());
-        if (logsRes.ok) setPatientLogs(await logsRes.json());
-        if (rxRes.ok) setPrescriptions(await rxRes.json());
-        if (alertsRes.ok) setAlerts(await alertsRes.json());
-        if (symptomsRes.ok) setSymptomLogs(await symptomsRes.json());
-      } catch (err) {
-        console.error("Error loading data from API:", err);
-      } finally {
-        setLoading(false);
-      }
+    const init = async () => {
+      setLoading(true);
+      await refreshData();
+      setLoading(false);
     };
-    loadData();
+    init();
   }, []);
 
   // ── Patients ──
@@ -257,7 +261,7 @@ export const DataProvider = ({ children }) => {
       addPatient, updatePatient, syncPatientToMobile, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
       addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
-      addPrescription, getPrescriptionsForPatient,
+      addPrescription, getPrescriptionsForPatient, refreshData,
       addDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
