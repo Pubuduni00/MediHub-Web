@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// â”€â”€ Firebase Admin Initialization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Firebase Admin Initialization ─────────────────────────────────────────────
 let db_firebase = null;
 
 try {
@@ -22,6 +22,7 @@ try {
   });
   db_firebase = getFirestore(firebaseApp);
   console.log('Firebase Admin initialized successfully');
+  initFirestoreListeners();
 } catch (err) {
   console.warn('Firebase Admin not initialized (missing serviceAccountKey.json):', err.message);
   console.warn('Firebase sync will be disabled. Add serviceAccountKey.json to enable it.');
@@ -64,6 +65,219 @@ async function syncAppointmentToFirestore(firebaseUid, apptId, apptData) {
   } catch (err) {
     console.error('Appointment Firestore sync error:', err.message);
   }
+}
+
+// Helper to register patient email in Firestore
+async function registerEmailInFirestore(email, patientId, name) {
+  if (!db_firebase || !email) return;
+  try {
+    const emailKey = email.toLowerCase().trim();
+    await db_firebase.collection('registered_emails').doc(emailKey).set({
+      patientId: patientId,
+      name: name,
+      registered: true,
+      syncedAt: new Date().toISOString()
+    }, { merge: true });
+    console.log('Registered email in Firestore:', emailKey);
+  } catch (err) {
+    console.error('Error registering email in Firestore:', err.message);
+  }
+}
+
+// Helper to initialize Firestore listeners
+function initFirestoreListeners() {
+  if (!db_firebase) return;
+  console.log('Initializing Firestore real-time listeners...');
+
+  // 1. Listen to users collection for linking
+  db_firebase.collection('users').onSnapshot(async (snapshot) => {
+    try {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'added' || change.type === 'modified') {
+          const userData = change.doc.data();
+          const firebaseUid = change.doc.id;
+          if (userData.email && (!userData.hospitalId || userData.hospitalId === null)) {
+            try {
+              const patient = await dbHelpers.get(
+                'SELECT * FROM patients WHERE LOWER(email) = ?',
+                [userData.email.toLowerCase()]
+              );
+              if (patient) {
+                if (patient.firebaseUid !== firebaseUid) {
+                  await dbHelpers.run(
+                    'UPDATE patients SET firebase_uid = ? WHERE id = ?',
+                    [firebaseUid, patient.id]
+                  );
+                  console.log(`[Listener] Linked Firebase UID ${firebaseUid} to patient ${patient.id}`);
+                }
+                await syncPatientToFirestore(firebaseUid, {
+                  fullName: patient.name,
+                  email: patient.email,
+                  phoneNumber: patient.phone,
+                  address: patient.address,
+                  dateOfBirth: patient.dob,
+                  gender: patient.gender,
+                  bloodGroup: patient.bloodGroup,
+                  hospitalId: patient.id,
+                  primaryCondition: patient.primaryCondition || '',
+                  diagnosis: patient.diagnosis || '',
+                  allergies: patient.allergies || '',
+                  emergencyContactName: patient.emergencyName || null,
+                  emergencyContactNumber: patient.emergencyContact || null,
+                });
+                
+                // Sync appointments
+                const appts = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
+                for (const appt of appts) {
+                  const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+                  const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
+                  await syncAppointmentToFirestore(firebaseUid, appt.id, {
+                    dateTime: apptDateTime,
+                    clinic: appt.details || appt.type || 'Clinic',
+                    doctorName: appt.doctorName,
+                    requestDetails: appt.details || '',
+                    status: appt.status === 'Confirmed' ? 'upcoming'
+                           : appt.status === 'Completed' ? 'completed'
+                           : appt.status === 'Cancelled' ? 'missed'
+                           : 'upcoming',
+                    rescheduleStatus: 'none',
+                    investigations: investigations,
+                    investigationNotes: appt.investigationNotes || null,
+                  });
+                }
+              }
+            } catch (err) {
+              console.error('[Listener] User link error:', err.message);
+            }
+          } else if (userData.hospitalId) {
+            try {
+              await dbHelpers.run(
+                `UPDATE patients SET
+                  dob = COALESCE(?, dob),
+                  phone = COALESCE(?, phone),
+                  emergencyName = COALESCE(?, emergencyName),
+                  emergencyContact = COALESCE(?, emergencyContact)
+                 WHERE id = ?`,
+                [
+                  userData.dateOfBirth || null,
+                  userData.phoneNumber || null,
+                  userData.emergencyContactName || null,
+                  userData.emergencyContactNumber || null,
+                  userData.hospitalId
+                ]
+              );
+              console.log(`[Listener] Synced updated mobile profile for patient ${userData.hospitalId} to PostgreSQL`);
+            } catch (err) {
+              console.error('[Listener] Error syncing mobile profile update to PostgreSQL:', err.message);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Listener] Users change processing error:', err.message);
+    }
+  });
+
+  // 2. Listen to check-ins
+  db_firebase.collectionGroup('checkIns').onSnapshot(async (snapshot) => {
+    try {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'added') {
+          const checkInData = change.doc.data();
+          const userDocRef = change.doc.ref.parent.parent;
+          if (!userDocRef) continue;
+          const firebaseUid = userDocRef.id;
+          try {
+            const patient = await dbHelpers.get(
+              'SELECT * FROM patients WHERE firebase_uid = ?',
+              [firebaseUid]
+            );
+            if (!patient) continue;
+            const dateStr = checkInData.date ? new Date(checkInData.date).toISOString() : new Date().toISOString();
+            const existingLog = await dbHelpers.get(
+              'SELECT * FROM symptom_logs WHERE patientid = ? AND date = ?',
+              [patient.id, dateStr]
+            );
+            if (!existingLog) {
+               const id = await generateNextId('symptom_logs', 'SL');
+               const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
+               const healthStatus = checkInData.healthStatus || 'stable';
+               const severity = healthStatus === 'critical' ? 'Severe'
+                              : healthStatus === 'warning' ? 'Moderate' : 'Mild';
+               await dbHelpers.run(
+                 'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                 [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', 'MediHub App']
+               );
+               if (healthStatus === 'critical') {
+                 const alertId = await generateNextId('alerts', 'AL');
+                 await dbHelpers.run(
+                   'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                   [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
+                 );
+               } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
+                 const alertId = await generateNextId('alerts', 'AL');
+                 await dbHelpers.run(
+                   'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                   [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
+                 );
+               }
+            }
+          } catch (err) {
+            console.error('[Listener] Check-in error:', err.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Listener] Check-ins change processing error:', err.message);
+    }
+  });
+
+  // 3. Listen to appointments for reschedule requests
+  db_firebase.collectionGroup('appointments').onSnapshot(async (snapshot) => {
+    try {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'modified') {
+          const apptData = change.doc.data();
+          const apptId = change.doc.id;
+          if (apptData.rescheduleStatus === 'requested') {
+            try {
+              const existingReq = await dbHelpers.get(
+                'SELECT * FROM reschedule_requests WHERE appointmentId = ? AND status = ?',
+                [apptId, 'Pending']
+              );
+              if (!existingReq) {
+                const appointment = await dbHelpers.get(
+                  'SELECT * FROM appointments WHERE id = ?',
+                  [apptId]
+                );
+                if (!appointment) continue;
+                const patient = await dbHelpers.get(
+                  'SELECT * FROM patients WHERE id = ?',
+                  [appointment.patientId]
+                );
+                if (!patient) continue;
+                const requestId = await generateNextId('reschedule_requests', 'RR');
+                await dbHelpers.run(
+                  'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                  [requestId, apptId, patient.id, appointment.doctorId, null, null, 'Pending', new Date().toISOString()]
+                );
+                const alertId = await generateNextId('alerts', 'AL');
+                await dbHelpers.run(
+                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                  [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule. Reason: ${apptData.rescheduleNote || 'Not specified'}`, 'warning', new Date().toISOString()]
+                );
+                console.log(`[Listener] Reschedule request ${requestId} created for appointment ${apptId}`);
+              }
+            } catch (err) {
+              console.error('[Listener] Reschedule error:', err.message);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Listener] Appointments change processing error:', err.message);
+    }
+  });
 }
 
 // Helper: get today's date as YYYY-MM-DD in local time (avoids UTC offset issues)
@@ -382,6 +596,9 @@ app.post('/api/patients', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, name, age, gender, dob, phone, email, address, bloodGroup, nic, emergencyContact, emergencyName, registeredDate, 'Active', primaryCondition, diagnosis, allergies]
     );
+    if (email) {
+      await registerEmailInFirestore(email, id, name);
+    }
     res.status(201).json({ id, name, age, gender, dob, phone, email, address, bloodGroup, nic, emergencyContact, emergencyName, registeredDate, status: 'Active', assignedDoctors: [] });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -417,10 +634,15 @@ app.put('/api/patients/:id', async (req, res) => {
     updated.statusHistory = updated.statusHistory ? JSON.parse(updated.statusHistory) : [];
     updated.assignedDoctors = assignments.map(a => a.doctor_id);
 
-    // â”€â”€ Sync updated patient profile to Firestore â”€â”€
+    // ── Sync updated patient profile to Firestore ──
+    if (updated.email) {
+      await registerEmailInFirestore(updated.email, updated.id, updated.name);
+    }
+
     if (updated.firebaseUid) {
       await syncPatientToFirestore(updated.firebaseUid, {
         fullName: updated.name,
+        email: updated.email,
         phoneNumber: updated.phone,
         address: updated.address,
         dateOfBirth: updated.dob,
@@ -430,6 +652,8 @@ app.put('/api/patients/:id', async (req, res) => {
         primaryCondition: updated.primaryCondition || '',
         diagnosis: updated.diagnosis || '',
         allergies: updated.allergies || '',
+        emergencyContactName: updated.emergencyName || null,
+        emergencyContactNumber: updated.emergencyContact || null,
       });
     }
 
