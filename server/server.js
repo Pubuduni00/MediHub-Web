@@ -1010,9 +1010,11 @@ app.post('/api/patient-logs', async (req, res) => {
     if (drugs && drugs.length > 0) {
       const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
       if (patient && patient.firebaseUid) {
+        const todayLocal = new Date();
+        const tomorrowLocal = new Date(todayLocal.getFullYear(), todayLocal.getMonth(), todayLocal.getDate() + 1, 0, 0, 0, 0);
+        const startDate = tomorrowLocal.getTime();
         for (const drug of drugs) {
           const medId = `${id}_${drug.drug.replace(/\s+/g, '_')}`;
-          const now = Date.now();
           // Build scheduled times based on frequency
           const scheduledTimes = buildScheduledTimes(drug.frequency || 'Once daily');
           await syncMedicationToFirestore(patient.firebaseUid, medId, {
@@ -1022,7 +1024,7 @@ app.post('/api/patient-logs', async (req, res) => {
             scheduledTimes: scheduledTimes,
             instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
             prescribedBy: doctorName,
-            startDate: now,
+            startDate: startDate,
             endDate: null,
             takenStatus: {},
           });
