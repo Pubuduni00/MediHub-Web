@@ -11,6 +11,113 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.post('/api/patients/:patientId/medications/:medId/stop', async (req, res) => {
+  const { patientId, medId } = req.params;
+  try {
+    const parts = medId.split('_');
+    const logId = parts[0];
+    const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+
+    // 1. Get the patient's firebase_uid
+    const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
+    if (patient && patient.firebaseUid) {
+      // Update Firestore medication doc
+      await db_firebase.collection('users').doc(patient.firebaseUid)
+        .collection('medications').doc(medId)
+        .set({ endDate: Date.now() }, { merge: true });
+      console.log(`[Stop Medication] Firestore updated for ${medId}`);
+    }
+
+    // 2. Update PostgreSQL patient_logs
+    const log = await dbHelpers.get('SELECT * FROM patient_logs WHERE id = ?', [logId]);
+    if (log) {
+      const drugs = log.drugs ? JSON.parse(log.drugs) : [];
+      const updatedDrugs = drugs.map(d => {
+        if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+          return { ...d, endDate: new Date().toISOString().split('T')[0] };
+        }
+        return d;
+      });
+      await dbHelpers.run('UPDATE patient_logs SET drugs = ? WHERE id = ?', [JSON.stringify(updatedDrugs), logId]);
+    }
+
+    // 3. Update PostgreSQL prescriptions
+    const rx = await dbHelpers.get('SELECT * FROM prescriptions WHERE logId = ?', [logId]);
+    if (rx) {
+      const drugs = rx.drugs ? JSON.parse(rx.drugs) : [];
+      const updatedDrugs = drugs.map(d => {
+        if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+          return { ...d, endDate: new Date().toISOString().split('T')[0] };
+        }
+        return d;
+      });
+      await dbHelpers.run('UPDATE prescriptions SET drugs = ? WHERE id = ?', [JSON.stringify(updatedDrugs), rx.id]);
+    }
+
+    res.json({ success: true, medId, endDate: new Date().toISOString().split('T')[0] });
+  } catch (err) {
+    console.error('Error stopping medication:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/patients/:patientId/medications/:medId/edit', async (req, res) => {
+  const { patientId, medId } = req.params;
+  const { dose, frequency, duration, mealInstruction, notes } = req.body;
+  try {
+    const parts = medId.split('_');
+    const logId = parts[0];
+    const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+
+    // 1. Get the patient's firebase_uid
+    const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
+    if (patient && patient.firebaseUid) {
+      const scheduledTimes = buildScheduledTimes(frequency || 'Once daily');
+      // Update Firestore medication doc
+      await db_firebase.collection('users').doc(patient.firebaseUid)
+        .collection('medications').doc(medId)
+        .set({
+          dosage: dose || '',
+          frequency: frequency || 'Once daily',
+          scheduledTimes: scheduledTimes,
+          instructions: `${mealInstruction || ''} ${notes || ''}`.trim()
+        }, { merge: true });
+      console.log(`[Edit Medication] Firestore updated for ${medId}`);
+    }
+
+    // 2. Update PostgreSQL patient_logs
+    const log = await dbHelpers.get('SELECT * FROM patient_logs WHERE id = ?', [logId]);
+    if (log) {
+      const drugs = log.drugs ? JSON.parse(log.drugs) : [];
+      const updatedDrugs = drugs.map(d => {
+        if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+          return { ...d, dose, frequency, duration, mealInstruction, notes };
+        }
+        return d;
+      });
+      await dbHelpers.run('UPDATE patient_logs SET drugs = ? WHERE id = ?', [JSON.stringify(updatedDrugs), logId]);
+    }
+
+    // 3. Update PostgreSQL prescriptions
+    const rx = await dbHelpers.get('SELECT * FROM prescriptions WHERE logId = ?', [logId]);
+    if (rx) {
+      const drugs = rx.drugs ? JSON.parse(rx.drugs) : [];
+      const updatedDrugs = drugs.map(d => {
+        if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+          return { ...d, dose, frequency, duration, mealInstruction, notes };
+        }
+        return d;
+      });
+      await dbHelpers.run('UPDATE prescriptions SET drugs = ? WHERE id = ?', [JSON.stringify(updatedDrugs), rx.id]);
+    }
+
+    res.json({ success: true, medId, updated: { dose, frequency, duration, mealInstruction, notes } });
+  } catch (err) {
+    console.error('Error editing medication:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── Firebase Admin Initialization ─────────────────────────────────────────────
 let db_firebase = null;
 
