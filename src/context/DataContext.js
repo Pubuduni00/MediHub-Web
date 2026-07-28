@@ -208,6 +208,98 @@ export const DataProvider = ({ children }) => {
 
   const getPrescriptionsForPatient = (patientId) => prescriptions.filter(r => r.patientId === patientId);
 
+  const stopMedication = async (patientId, medId) => {
+    try {
+      const res = await fetch(`${API_URL}/patients/${patientId}/medications/${medId}/stop`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Update local prescriptions state
+        setPrescriptions(prev => prev.map(rx => {
+          const parts = medId.split('_');
+          const logId = parts[0];
+          const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+          if (rx.logId === logId || rx.id === logId) {
+            const updatedDrugs = rx.drugs.map(d => {
+              if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+                return { ...d, endDate: data.endDate };
+              }
+              return d;
+            });
+            return { ...rx, drugs: updatedDrugs };
+          }
+          return rx;
+        }));
+        
+        // Also update local patientLogs state
+        setPatientLogs(prev => prev.map(log => {
+          const parts = medId.split('_');
+          const logId = parts[0];
+          const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+          if (log.id === logId) {
+            const updatedDrugs = log.drugs.map(d => {
+              if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+                return { ...d, endDate: data.endDate };
+              }
+              return d;
+            });
+            return { ...log, drugs: updatedDrugs };
+          }
+          return log;
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to stop medication:", err);
+    }
+  };
+
+  const editMedication = async (patientId, medId, updates) => {
+    try {
+      const res = await fetch(`${API_URL}/patients/${patientId}/medications/${medId}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const parts = medId.split('_');
+        const logId = parts[0];
+        const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+
+        // Update local prescriptions state
+        setPrescriptions(prev => prev.map(rx => {
+          if (rx.logId === logId || rx.id === logId) {
+            const updatedDrugs = rx.drugs.map(d => {
+              if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+                return { ...d, ...data.updated };
+              }
+              return d;
+            });
+            return { ...rx, drugs: updatedDrugs };
+          }
+          return rx;
+        }));
+        
+        // Also update local patientLogs state
+        setPatientLogs(prev => prev.map(log => {
+          if (log.id === logId) {
+            const updatedDrugs = log.drugs.map(d => {
+              if (d.drug.toLowerCase().trim() === drugName.toLowerCase().trim()) {
+                return { ...d, ...data.updated };
+              }
+              return d;
+            });
+            return { ...log, drugs: updatedDrugs };
+          }
+          return log;
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to edit medication:", err);
+    }
+  };
+
   // ── Doctors ──
   const addDoctor = async (doc) => {
     try {
@@ -261,7 +353,7 @@ export const DataProvider = ({ children }) => {
       addPatient, updatePatient, syncPatientToMobile, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
       addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
-      addPrescription, getPrescriptionsForPatient, refreshData,
+      addPrescription, getPrescriptionsForPatient, stopMedication, editMedication, refreshData,
       addDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
