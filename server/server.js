@@ -963,15 +963,155 @@ app.post('/api/patient-logs', async (req, res) => {
     const id = await generateNextId('patient_logs', 'LOG');
     const date = getLocalDateString();
     const examStr = JSON.stringify(examination || {});
-    const drugsStr = JSON.stringify(drugs || []);
     const invStr = JSON.stringify(investigations || []);
 
+    // 1. Separate new, stopped, and continued/modified drugs
+    const newDrugs = [];
+    const stoppedDrugs = [];
+    const modifiedDrugs = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
+
+    if (drugs && drugs.length > 0) {
+      for (const drug of drugs) {
+        if (!drug.drug) continue;
+
+        if (drug.isExisting) {
+          const medId = `${drug.logId || drug.rxId}_${drug.drug.replace(/\s+/g, '_')}`;
+
+          if (drug.status === 'Stop') {
+            // Stop in Firestore
+            if (patient && patient.firebaseUid) {
+              await db_firebase.collection('users').doc(patient.firebaseUid)
+                .collection('medications').doc(medId)
+                .set({ endDate: Date.now() }, { merge: true });
+            }
+
+            // Update PostgreSQL past patient_logs
+            const pastLog = await dbHelpers.get('SELECT * FROM patient_logs WHERE id = ?', [drug.logId]);
+            if (pastLog) {
+              const plDrugs = pastLog.drugs ? JSON.parse(pastLog.drugs) : [];
+              const updated = plDrugs.map(d => {
+                if (d.drug.toLowerCase().trim() === drug.drug.toLowerCase().trim()) {
+                  return { ...d, endDate: todayStr };
+                }
+                return d;
+              });
+              await dbHelpers.run('UPDATE patient_logs SET drugs = ? WHERE id = ?', [JSON.stringify(updated), drug.logId]);
+            }
+
+            // Update PostgreSQL past prescriptions
+            const pastRx = await dbHelpers.get('SELECT * FROM prescriptions WHERE logId = ?', [drug.logId]);
+            if (pastRx) {
+              const prDrugs = pastRx.drugs ? JSON.parse(pastRx.drugs) : [];
+              const updated = prDrugs.map(d => {
+                if (d.drug.toLowerCase().trim() === drug.drug.toLowerCase().trim()) {
+                  return { ...d, endDate: todayStr };
+                }
+                return d;
+              });
+              await dbHelpers.run('UPDATE prescriptions SET drugs = ? WHERE id = ?', [JSON.stringify(updated), pastRx.id]);
+            }
+
+            stoppedDrugs.push({
+              drug: drug.drug,
+              dose: drug.dose,
+              changeType: 'Stopped',
+              endDate: todayStr
+            });
+
+          } else {
+            // Check if modified
+            const isModified = drug.dose !== drug.originalDose || 
+                               drug.frequency !== drug.originalFreq || 
+                               drug.duration !== drug.originalDur ||
+                               drug.mealInstruction !== drug.originalMeal ||
+                               drug.notes !== drug.originalNotes;
+
+            if (isModified) {
+              // Update in Firestore
+              if (patient && patient.firebaseUid) {
+                const scheduledTimes = buildScheduledTimes(drug.frequency || 'Once daily');
+                await db_firebase.collection('users').doc(patient.firebaseUid)
+                  .collection('medications').doc(medId)
+                  .set({
+                    dosage: drug.dose || '',
+                    frequency: drug.frequency || 'Once daily',
+                    scheduledTimes: scheduledTimes,
+                    instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim()
+                  }, { merge: true });
+              }
+
+              // Update PostgreSQL past patient_logs
+              const pastLog = await dbHelpers.get('SELECT * FROM patient_logs WHERE id = ?', [drug.logId]);
+              if (pastLog) {
+                const plDrugs = pastLog.drugs ? JSON.parse(pastLog.drugs) : [];
+                const updated = plDrugs.map(d => {
+                  if (d.drug.toLowerCase().trim() === drug.drug.toLowerCase().trim()) {
+                    return { ...d, dose: drug.dose, frequency: drug.frequency, duration: drug.duration, mealInstruction: drug.mealInstruction, notes: drug.notes };
+                  }
+                  return d;
+                });
+                await dbHelpers.run('UPDATE patient_logs SET drugs = ? WHERE id = ?', [JSON.stringify(updated), drug.logId]);
+              }
+
+              // Update PostgreSQL past prescriptions
+              const pastRx = await dbHelpers.get('SELECT * FROM prescriptions WHERE logId = ?', [drug.logId]);
+              if (pastRx) {
+                const prDrugs = pastRx.drugs ? JSON.parse(pastRx.drugs) : [];
+                const updated = prDrugs.map(d => {
+                  if (d.drug.toLowerCase().trim() === drug.drug.toLowerCase().trim()) {
+                    return { ...d, dose: drug.dose, frequency: drug.frequency, duration: drug.duration, mealInstruction: drug.mealInstruction, notes: drug.notes };
+                  }
+                  return d;
+                });
+                await dbHelpers.run('UPDATE prescriptions SET drugs = ? WHERE id = ?', [JSON.stringify(updated), pastRx.id]);
+              }
+
+              modifiedDrugs.push({
+                drug: drug.drug,
+                dose: drug.dose,
+                frequency: drug.frequency,
+                changeType: 'Modified'
+              });
+            }
+          }
+        } else {
+          // New drug
+          newDrugs.push({
+            drug: drug.drug,
+            dose: drug.dose,
+            frequency: drug.frequency,
+            duration: drug.duration,
+            mealInstruction: drug.mealInstruction,
+            notes: drug.notes,
+            changeType: 'Added'
+          });
+        }
+      }
+    }
+
+    const allChanges = [...newDrugs, ...stoppedDrugs, ...modifiedDrugs];
+    const drugsStr = JSON.stringify(allChanges);
+
+    // Save Patient Log
     await dbHelpers.run(
       'INSERT INTO patient_logs (id, patientId, doctorId, doctorName, date, examination, drugs, investigations) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [id, patientId, doctorId, doctorName, date, examStr, drugsStr, invStr]
     );
 
-    // If next session investigations are specified, copy them to the next upcoming appointment
+    // Automatically create Prescription record if there are changes
+    if (allChanges.length > 0) {
+      const rxId = await generateNextId('prescriptions', 'RX');
+      await dbHelpers.run(
+        'INSERT INTO prescriptions (id, patientId, logId, addedBy, date, drugs) VALUES (?, ?, ?, ?, ?, ?)',
+        [rxId, patientId, id, doctorId, date, drugsStr]
+      );
+      console.log(`Created prescription ${rxId} automatically for log ${id}`);
+    }
+
+    // Copy next session investigations to next upcoming appointment
     if (nextSessionInvestigations && nextSessionInvestigations.length > 0) {
       const nextAppt = await dbHelpers.get(
         "SELECT * FROM appointments WHERE patientId = ? AND id != ? AND date >= ? AND status NOT IN ('Completed', 'Cancelled', 'Missed') ORDER BY date ASC, time ASC LIMIT 1",
@@ -984,8 +1124,7 @@ app.post('/api/patient-logs', async (req, res) => {
           "UPDATE appointments SET investigations = ?, investigationNotes = ? WHERE id = ?",
           [invsJson, nextSessionNotes || null, nextAppt.id]
         );
-        // Sync the updated appointment to Firestore immediately
-        const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
+        // Sync to Firestore
         if (patient && patient.firebaseUid) {
           const apptDateTime = new Date(`${nextAppt.date}T${nextAppt.time}`).getTime();
           await syncAppointmentToFirestore(patient.firebaseUid, nextAppt.id, {
@@ -1006,34 +1145,32 @@ app.post('/api/patient-logs', async (req, res) => {
       }
     }
 
-    // â”€â”€ Sync medications to Firestore when doctor adds drugs in log â”€â”€
-    if (drugs && drugs.length > 0) {
-      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
-      if (patient && patient.firebaseUid) {
-        const todayLocal = new Date();
-        const tomorrowLocal = new Date(todayLocal.getFullYear(), todayLocal.getMonth(), todayLocal.getDate() + 1, 0, 0, 0, 0);
-        const startDate = tomorrowLocal.getTime();
-        for (const drug of drugs) {
-          const medId = `${id}_${drug.drug.replace(/\s+/g, '_')}`;
-          // Build scheduled times based on frequency
-          const scheduledTimes = buildScheduledTimes(drug.frequency || 'Once daily');
-          await syncMedicationToFirestore(patient.firebaseUid, medId, {
-            name: drug.drug,
-            dosage: drug.dose || '',
-            frequency: drug.frequency || 'Once daily',
-            scheduledTimes: scheduledTimes,
-            instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
-            prescribedBy: doctorName,
-            startDate: startDate,
-            endDate: null,
-            takenStatus: {},
-          });
-        }
-        console.log(`Synced ${drugs.length} medications to Firestore for patient ${patientId}`);
+    // Sync new medications to Firestore
+    if (newDrugs.length > 0 && patient && patient.firebaseUid) {
+      const todayLocal = new Date();
+      const tomorrowLocal = new Date(todayLocal.getFullYear(), todayLocal.getMonth(), todayLocal.getDate() + 1, 0, 0, 0, 0);
+      const startDate = tomorrowLocal.getTime();
+
+      for (const drug of newDrugs) {
+        const medId = `${id}_${drug.drug.replace(/\s+/g, '_')}`;
+        // Build scheduled times based on frequency
+        const scheduledTimes = buildScheduledTimes(drug.frequency || 'Once daily');
+        await syncMedicationToFirestore(patient.firebaseUid, medId, {
+          name: drug.drug,
+          dosage: drug.dose || '',
+          frequency: drug.frequency || 'Once daily',
+          scheduledTimes: scheduledTimes,
+          instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
+          prescribedBy: doctorName,
+          startDate: startDate,
+          endDate: null,
+          takenStatus: {},
+        });
       }
+      console.log(`Synced ${newDrugs.length} new medications to Firestore for patient ${patientId}`);
     }
 
-    res.status(201).json({ id, patientId, doctorId, doctorName, date, examination: examination || {}, drugs: drugs || [], investigations: investigations || [] });
+    res.status(201).json({ id, patientId, doctorId, doctorName, date, examination: examination || {}, drugs: allChanges, investigations: investigations || [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
