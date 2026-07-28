@@ -1111,11 +1111,12 @@ app.post('/api/appointments', async (req, res) => {
       await dbHelpers.run('INSERT INTO doctor_patients (doctor_id, patient_id) VALUES (?, ?)', [doctorId, patientId]);
     }
 
-    // â”€â”€ Sync appointment to Firestore for mobile app â”€â”€
+    // ── Sync appointment to Firestore for mobile app ──
     const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
     if (patient && patient.firebaseUid) {
       const apptDateTime = new Date(`${date}T${time}`).getTime();
-      await syncAppointmentToFirestore(patient.firebaseUid, id, {
+      // Run Firestore sync asynchronously in the background to avoid response delay
+      syncAppointmentToFirestore(patient.firebaseUid, id, {
         dateTime: apptDateTime,
         clinic: details || type || 'Clinic',
         doctorName: doctorName,

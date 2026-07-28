@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isPast, isToday } from 'date-fns';
-import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar, Clock, Play } from 'lucide-react';
+import { Download, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Calendar, Clock, Play, Check, CheckCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
@@ -23,9 +23,11 @@ export default function AppointmentsPage() {
   const { isDoctor, user } = useAuth();
   const navigate = useNavigate();
 
-  const handleStartAppointment = (apptId, patientId) => {
-    sessionStorage.setItem('active_appt_id', apptId);
-    navigate(`/patients/${patientId}`);
+  const handleStartAppointment = (appt) => {
+    sessionStorage.setItem('active_appt_id', appt.id);
+    sessionStorage.setItem('activeAppointmentId', appt.id);
+    sessionStorage.setItem('activePatientId', appt.patientId);
+    navigate(`/patients/${appt.patientId}`);
   };
 
   const handleDelete = async (id) => {
@@ -41,12 +43,6 @@ export default function AppointmentsPage() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [showAvailability, setShowAvailability] = useState(false);
 
-  const startSession = (appt) => {
-    sessionStorage.setItem('activeAppointmentId', appt.id);
-    sessionStorage.setItem('activePatientId', appt.patientId);
-    navigate(`/patients/${appt.patientId}`);
-  };
-
   const calDays = eachDayOfInterval({
     start: startOfWeek(startOfMonth(calMonth)),
     end:   endOfWeek(endOfMonth(calMonth)),
@@ -59,9 +55,18 @@ export default function AppointmentsPage() {
     return list.length;
   };
 
-  let dayAppts = appointments.filter(a => a.date===selectedDate);
-  if (isDoctor) dayAppts = dayAppts.filter(a => a.doctorId===user?.id);
-  dayAppts = dayAppts
+  // Get all appointments for selected day (before filterStatus and search filter)
+  let todayAllAppts = appointments.filter(a => a.date===selectedDate);
+  if (isDoctor) todayAllAppts = todayAllAppts.filter(a => a.doctorId===user?.id);
+
+  const stats = {
+    total: todayAllAppts.length,
+    confirmed: todayAllAppts.filter(a => a.status === 'Confirmed').length,
+    pending: todayAllAppts.filter(a => a.status === 'Pending').length,
+    completed: todayAllAppts.filter(a => a.status === 'Completed').length,
+  };
+
+  let dayAppts = todayAllAppts
     .filter(a => {
       const q = search.toLowerCase();
       return (
@@ -76,14 +81,10 @@ export default function AppointmentsPage() {
   const displayDate = selectedDate ? format(parseISO(selectedDate),'EEEE, dd MMMM yyyy') : '';
 
   const StatusPill = ({ status }) => {
-    const cls = status==='Confirmed' ? 'confirmed'
-      : status==='Pending'   ? 'pending'
-      : status==='Completed' ? 'completed'
-      : status==='Missed'    ? 'missed'
-      : 'cancelled';
+    const cls = status.toLowerCase();
     return (
-      <span className={`appts-status-pill ${cls}`}>
-        <span style={{ width:6, height:6, borderRadius:'50%', background:'currentColor', flexShrink:0 }}/>
+      <span className={`appt-status-pill ${cls}`}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
         {status}
       </span>
     );
@@ -94,7 +95,10 @@ export default function AppointmentsPage() {
 
       {/* Top bar */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
-        <p style={{ fontSize:13.5, color:'var(--text-muted)' }}>Schedule management & calendar</p>
+        <div>
+          <h1 className="page-title" style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Appointments</h1>
+          <p style={{ fontSize:13, color:'var(--text-muted)', marginTop:2 }}>Schedule management & calendar</p>
+        </div>
         <div style={{ display:'flex', gap:8 }}>
           {isDoctor && (
             <button className="btn btn-primary btn-sm" style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', color: '#fff' }} onClick={() => setShowAvailability(true)}>
@@ -110,35 +114,76 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
+      {/* KPI Stats Grid */}
+      <div className="appts-stats-grid">
+        <div className="appt-stat-card">
+          <div className="appt-stat-icon total">
+            <Calendar size={18} />
+          </div>
+          <div className="appt-stat-info">
+            <span className="appt-stat-label">Total Scheduled</span>
+            <span className="appt-stat-value">{stats.total}</span>
+          </div>
+        </div>
+        <div className="appt-stat-card">
+          <div className="appt-stat-icon confirmed">
+            <Check size={18} />
+          </div>
+          <div className="appt-stat-info">
+            <span className="appt-stat-label">Confirmed</span>
+            <span className="appt-stat-value">{stats.confirmed}</span>
+          </div>
+        </div>
+        <div className="appt-stat-card">
+          <div className="appt-stat-icon pending">
+            <Clock size={18} />
+          </div>
+          <div className="appt-stat-info">
+            <span className="appt-stat-label">Pending</span>
+            <span className="appt-stat-value">{stats.pending}</span>
+          </div>
+        </div>
+        <div className="appt-stat-card">
+          <div className="appt-stat-icon completed">
+            <CheckCircle size={18} />
+          </div>
+          <div className="appt-stat-info">
+            <span className="appt-stat-label">Completed</span>
+            <span className="appt-stat-value">{stats.completed}</span>
+          </div>
+        </div>
+      </div>
+
       <div className="appts-main-grid">
 
         {/* LEFT — appointments */}
-        <div className="card" style={{ minWidth:0, overflow:'hidden' }}>
+        <div className="card" style={{ minWidth:0, padding: '24px 20px' }}>
           <div className="appts-day-header">
             <div>
-              <h3 style={{ fontSize:15, fontWeight:700 }}>{displayDate}</h3>
-              <p style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>
-                {dayAppts.length} appointment{dayAppts.length!==1?'s':''}
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{displayDate}</h3>
+              <p style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:2 }}>
+                {dayAppts.length} filtered appointment{dayAppts.length!==1?'s':''}
               </p>
             </div>
-            <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-              <div className="search-bar" style={{ width:160 }}>
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <div className="search-bar" style={{ width:160, padding: '5px 12px' }}>
                 <Search size={12} color="var(--text-muted)"/>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."/>
               </div>
-              {['All','Confirmed','Pending','Completed'].map(f=>(
-                <button key={f} onClick={()=>setFilterStatus(f)}
-                  className={`btn btn-sm ${filterStatus===f?'btn-primary':'btn-ghost'}`}
-                  style={{ padding:'5px 10px', fontSize:12 }}>
-                  {f}
-                </button>
-              ))}
+              <div className="appts-filter-tabs">
+                {['All','Confirmed','Pending','Completed'].map(f=>(
+                  <button key={f} onClick={()=>setFilterStatus(f)}
+                    className={`appts-filter-btn ${filterStatus===f ? 'active' : ''}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {isPastDate(selectedDate) && (
-            <div style={{ background:'var(--accent-orange-light)', border:'1px solid #FED7AA', borderRadius:'var(--radius-md)', padding:'7px 12px', fontSize:12.5, color:'var(--accent-orange)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-              <Calendar size={13}/> Past date — view only, editing disabled.
+            <div style={{ background:'var(--accent-orange-light)', border:'1px solid #FED7AA', borderRadius:'var(--radius-md)', padding:'9px 14px', fontSize:13, color:'var(--accent-orange)', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
+              <Calendar size={14}/> Past date — view only mode. Editing and actions are disabled.
             </div>
           )}
 
@@ -147,135 +192,113 @@ export default function AppointmentsPage() {
               action={<button className="btn btn-primary btn-sm" onClick={()=>setShowAdd(true)}><Plus size={13}/> Add</button>}
             />
           ) : (
-            <div className="appts-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Time</th>
-                    <th>Patient</th>
-                    <th>ID</th>
-                    {!isDoctor && <th>Doctor</th>}
-                    <th>Type</th>
-                    <th>Dur.</th>
-                    <th>Status</th>
-                    <th></th>
-                    {isDoctor && <th></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dayAppts.map((a,i) => (
-                    <tr key={a.id}>
-                      <td style={{ color:'var(--text-muted)', fontSize:12, width:28 }}>{i+1}</td>
-                      <td style={{ width:58 }}>
-                        <span style={{ fontWeight:700, color:'var(--primary)', fontSize:13 }}>{a.time}</span>
-                      </td>
-                      <td className="col-patient" style={{ fontWeight:600 }}>{a.patientName}</td>
-                      <td style={{ width:62 }}>
-                        <span style={{ fontFamily:'monospace', fontSize:11.5, color:'var(--primary)', background:'var(--primary-light)', padding:'2px 6px', borderRadius:3 }}>
-                          {a.patientId}
-                        </span>
-                      </td>
-                      {!isDoctor && (
-                        <td style={{ fontSize:12.5, maxWidth:120, overflow:'hidden', textOverflow:'ellipsis' }}>
-                          {a.doctorName}
-                        </td>
-                      )}
-                      <td style={{ width:82 }}>
-                        <span style={{ background:'var(--primary-light)', color:'var(--primary)', padding:'3px 8px', borderRadius:12, fontSize:11.5, fontWeight:600, whiteSpace:'nowrap' }}>
-                          {a.type}
-                        </span>
-                      </td>
-                      <td style={{ width:40, color:'var(--text-muted)', fontSize:12 }}>{a.duration||30}m</td>
-                      <td style={{ width:108 }}><StatusPill status={a.status}/></td>
-                      <td style={{ width: isDoctor ? 110 : 76 }}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          {isDoctor && a.status !== 'Completed' && (
-                            <button
-                              className="appts-edit-btn"
-                              style={{
-                                color: '#fff',
-                                background: 'var(--accent-green)',
-                                borderColor: 'var(--accent-green)',
-                                padding: '4px 10px',
-                                display: 'flex', alignItems: 'center', gap: 4,
-                                fontWeight: 600, fontSize: 12, borderRadius: 6
-                              }}
-                              onClick={() => handleStartAppointment(a.id, a.patientId)}
-                              title="Start appointment session"
-                            >
-                              <Play size={11} fill="currentColor"/> Start
-                            </button>
-                          )}
-                          <button
-                            className="appts-edit-btn"
-                            onClick={() => !isPastDate(selectedDate) && setEditAppt(a)}
-                            disabled={isPastDate(selectedDate)}
-                            title={isPastDate(selectedDate) ? 'Cannot edit past appointments' : 'Edit'}
-                          >
-                            <Edit2 size={12}/>
-                          </button>
-                          <button
-                            className="appts-edit-btn"
-                            style={{ color: 'var(--accent-red)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                            onClick={() => handleDelete(a.id)}
-                            title="Delete Appointment"
-                          >
-                            <Trash2 size={12}/>
-                          </button>
+            <div className="appt-cards-stack">
+              {dayAppts.map((a) => {
+                // Get initials for avatar
+                const initials = a.patientName ? a.patientName.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'PT';
+                const docInitials = a.doctorName ? a.doctorName.replace('Dr. ', '').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'DR';
+                
+                return (
+                  <div className="appt-row-card" key={a.id}>
+                    {/* Color indicator bar */}
+                    <div className={`appt-status-indicator ${a.status.toLowerCase()}`} />
+                    
+                    {/* Time Block */}
+                    <div className="appt-time-block">
+                      <span className="appt-time-value">{a.time}</span>
+                      <span className="appt-time-duration">{a.duration||30} min</span>
+                    </div>
+
+                    {/* Patient block */}
+                    <div className="appt-info-block patient">
+                      <div className="appt-avatar">{initials}</div>
+                      <div className="appt-text-details">
+                        <span className="appt-name" title={a.patientName}>{a.patientName}</span>
+                        <span className="appt-subtext">{a.patientId}</span>
+                      </div>
+                    </div>
+
+                    {/* Doctor block (only show if current user is not a doctor) */}
+                    {!isDoctor && (
+                      <div className="appt-info-block doctor">
+                        <div className="appt-avatar doctor">{docInitials}</div>
+                        <div className="appt-text-details">
+                          <span className="appt-name" title={a.doctorName}>{a.doctorName}</span>
+                          <span className="appt-subtext" style={{ fontFamily: 'var(--font-body)', letterSpacing: 0 }}>Doctor</span>
                         </div>
-                      </td>
-                      {isDoctor && (
-                        <td style={{ width:70 }}>
-                          {a.status !== 'Completed' && a.status !== 'Cancelled' && a.status !== 'Missed' && a.date === format(new Date(), 'yyyy-MM-dd') && (
-                            <button
-                              onClick={() => startSession(a)}
-                              title="Start appointment session"
-                              style={{
-                                display:'flex', alignItems:'center', gap:4,
-                                background:'var(--accent-green)', color:'#fff',
-                                border:'none', borderRadius:6, padding:'4px 9px',
-                                fontSize:11.5, fontWeight:700, cursor:'pointer',
-                                whiteSpace:'nowrap'
-                              }}
-                            >
-                              <Play size={10} fill="currentColor"/> Start
-                            </button>
-                          )}
-                        </td>
+                      </div>
+                    )}
+
+                    {/* Type badge */}
+                    <div className="appt-type-badge-container">
+                      <span className="appt-type-badge">{a.type}</span>
+                    </div>
+
+                    {/* Status badge */}
+                    <div className="appt-status-pill-container">
+                      <StatusPill status={a.status} />
+                    </div>
+
+                    {/* Action buttons cell */}
+                    <div className="appt-actions-cell">
+                      {isDoctor && a.status !== 'Completed' && a.status !== 'Cancelled' && a.status !== 'Missed' && !isPastDate(a.date) && (
+                        <button
+                          className="appt-btn success-start"
+                          onClick={() => handleStartAppointment(a)}
+                          title="Start appointment session"
+                        >
+                          <Play size={11} fill="currentColor" style={{ marginRight: 4 }}/> Start
+                        </button>
                       )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      
+                      <button
+                        className="appt-btn"
+                        onClick={() => !isPastDate(selectedDate) && setEditAppt(a)}
+                        disabled={isPastDate(selectedDate)}
+                        title={isPastDate(selectedDate) ? 'Cannot edit past appointments' : 'Edit'}
+                      >
+                        <Edit2 size={12}/>
+                      </button>
+                      
+                      <button
+                        className="appt-btn danger"
+                        onClick={() => handleDelete(a.id)}
+                        title="Delete Appointment"
+                      >
+                        <Trash2 size={12}/>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* RIGHT — mini calendar */}
         <div className="appts-mini-calendar">
-          <div className="card" style={{ padding:'14px 12px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-              <p style={{ fontSize:13, fontWeight:700 }}>{format(calMonth,'MMM yyyy')}</p>
+          <div className="card" style={{ padding:'16px 14px' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+              <p style={{ fontSize:14, fontWeight:700, color: 'var(--text-primary)' }}>{format(calMonth,'MMMM yyyy')}</p>
               <div style={{ display:'flex', gap:2 }}>
-                <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:4 }}
+                <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:4, borderRadius: 4 }}
                   onClick={()=>setCalMonth(subMonths(calMonth,1))}><ChevronLeft size={13}/></button>
-                <button className="btn btn-ghost btn-sm" style={{ padding:'3px 7px', fontSize:11 }}
+                <button className="btn btn-ghost btn-sm" style={{ padding:'3px 8px', fontSize:11, borderRadius: 4 }}
                   onClick={()=>{ setCalMonth(new Date()); setSelectedDate(format(new Date(),'yyyy-MM-dd')); }}>
                   Today
                 </button>
-                <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:4 }}
+                <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:4, borderRadius: 4 }}
                   onClick={()=>setCalMonth(addMonths(calMonth,1))}><ChevronRight size={13}/></button>
               </div>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:4 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:6 }}>
               {DAYS.map(d=>(
-                <div key={d} style={{ textAlign:'center', fontSize:9.5, fontWeight:700, color:'var(--text-muted)' }}>{d}</div>
+                <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'var(--text-muted)' }}>{d}</div>
               ))}
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:1 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
               {calDays.map(day => {
                 const str      = format(day,'yyyy-MM-dd');
                 const count    = getCountForDay(day);
@@ -285,33 +308,27 @@ export default function AppointmentsPage() {
                 return (
                   <div key={day.toString()}
                     onClick={() => inMonth && setSelectedDate(str)}
+                    className={`cal-day-cell ${isSel ? 'selected' : ''} ${!inMonth ? 'other-month' : ''}`}
                     style={{
-                      aspectRatio:'1', display:'flex', flexDirection:'column',
-                      alignItems:'center', justifyContent:'center', borderRadius:5,
-                      cursor: inMonth?'pointer':'default',
-                      background: isSel?'var(--primary)':isToday2?'var(--primary-light)':'transparent',
                       border: isToday2&&!isSel?'1.5px solid var(--primary)':'1.5px solid transparent',
-                      opacity: inMonth?1:0.2, transition:'var(--transition)', minHeight:26,
                     }}
-                    onMouseEnter={e=>{ if(inMonth&&!isSel) e.currentTarget.style.background='var(--primary-light)'; }}
-                    onMouseLeave={e=>{ if(!isSel) e.currentTarget.style.background=isToday2?'var(--primary-light)':'transparent'; }}
                   >
-                    <span style={{ fontSize:11, fontWeight:isSel||isToday2?700:400, color:isSel?'#fff':isToday2?'var(--primary)':'var(--text-primary)', lineHeight:1 }}>
+                    <span style={{ fontSize:11.5, fontWeight:isSel||isToday2?700:500, color:isSel?'#fff':isToday2?'var(--primary)':'var(--text-primary)', lineHeight: 1 }}>
                       {format(day,'d')}
                     </span>
                     {count>0&&inMonth && (
-                      <div style={{ width:4, height:4, borderRadius:'50%', background:isSel?'rgba(255,255,255,0.8)':'var(--accent-green)', marginTop:1 }}/>
+                      <div className="cal-day-dot" />
                     )}
                   </div>
                 );
               })}
             </div>
 
-            <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:5 }}>
+            <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6 }}>
               {[{c:'var(--accent-green)',l:'Has appointments'},{c:'var(--primary)',l:'Selected / Today'}].map(x=>(
-                <div key={x.l} style={{ display:'flex', alignItems:'center', gap:5 }}>
-                  <div style={{ width:7, height:7, borderRadius:'50%', background:x.c }}/>
-                  <span style={{ fontSize:10.5, color:'var(--text-muted)' }}>{x.l}</span>
+                <div key={x.l} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:x.c }}/>
+                  <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight: 500 }}>{x.l}</span>
                 </div>
               ))}
             </div>
