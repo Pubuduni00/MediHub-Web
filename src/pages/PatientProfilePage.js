@@ -263,18 +263,7 @@ export default function PatientProfilePage() {
                     <span className="info-value" style={{ color:'var(--accent-red)', fontWeight:600 }}>{mh.probableDiagnosis}</span>
                   </div>
                 )}
-                {mh.treatments?.length>0 && mh.treatments[0].drug && (
-                  <div style={{ marginTop:8 }}>
-                    <p style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600, marginBottom:6 }}>TREATMENTS</p>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {mh.treatments.filter(t=>t.drug).map((t,i)=>(
-                        <span key={i} style={{ background:'var(--secondary-light)', color:'var(--secondary)', padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:500 }}>
-                          {t.drug} {t.dose} — {t.frequency}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
             )}
           </div>

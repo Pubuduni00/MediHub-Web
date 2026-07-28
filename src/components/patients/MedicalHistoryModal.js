@@ -25,8 +25,6 @@ const EMPTY = {
   dataCollected: '',
   investigationsOrdered: '',
   investigationResults: '',
-  // Treatment
-  treatments: [{ drug:'', dose:'', frequency:'' }],
   instructionsGiven: '',
   // Management plan
   managementPlan: { followUp: false, referral: false, advice: false },
@@ -42,10 +40,6 @@ export default function MedicalHistoryModal({ isOpen, onClose, patientId, existi
 
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const setNested = (parent, f, v) => setForm(p => ({ ...p, [parent]: { ...p[parent], [f]: v } }));
-
-  const addTreatment = () => setForm(p => ({ ...p, treatments: [...p.treatments, { drug:'', dose:'', frequency:'' }] }));
-  const setTreatment = (i, f, v) => setForm(p => ({ ...p, treatments: p.treatments.map((t,idx) => idx===i ? {...t,[f]:v} : t) }));
-  const removeTreatment = (i) => setForm(p => ({ ...p, treatments: p.treatments.filter((_,idx) => idx!==i) }));
 
   const handleSave = () => {
     updatePatient(patientId, { medicalHistory: { ...form, savedBy: user?.name, savedAt: new Date().toISOString() } });
@@ -161,29 +155,7 @@ export default function MedicalHistoryModal({ isOpen, onClose, patientId, existi
             <F label="Investigation Results" field="investigationResults" ph="Results summary..." rows={2}/>
           </div>
 
-          {/* Treatment */}
-          <p className="section-label" style={{margin:'16px 0 10px'}}>Treatment</p>
-          <p style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10}}>Drug name · Dose · Frequency (e.g. Losartan 50mg BD)</p>
-          {form.treatments.map((t,i)=>(
-            <div key={i} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:10,marginBottom:8,alignItems:'end'}}>
-              <div className="form-group" style={{margin:0}}>
-                {i===0&&<label className="form-label">Drug Name</label>}
-                <input className="form-control" value={t.drug} onChange={e=>setTreatment(i,'drug',e.target.value)} placeholder="e.g. Losartan"/>
-              </div>
-              <div className="form-group" style={{margin:0}}>
-                {i===0&&<label className="form-label">Dose</label>}
-                <input className="form-control" value={t.dose} onChange={e=>setTreatment(i,'dose',e.target.value)} placeholder="e.g. 50mg"/>
-              </div>
-              <div className="form-group" style={{margin:0}}>
-                {i===0&&<label className="form-label">Frequency</label>}
-                <input className="form-control" value={t.frequency} onChange={e=>setTreatment(i,'frequency',e.target.value)} placeholder="e.g. BD"/>
-              </div>
-              {form.treatments.length>1&&(
-                <button className="btn btn-ghost btn-sm btn-icon" onClick={()=>removeTreatment(i)} style={{color:'var(--accent-red)',marginTop:i===0?20:0}}>✕</button>
-              )}
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm" onClick={addTreatment} style={{marginBottom:16}}>+ Add Drug</button>
+
 
           <F label="Instructions Given" field="instructionsGiven" ph="Dietary advice, lifestyle instructions..." rows={2}/>
 
