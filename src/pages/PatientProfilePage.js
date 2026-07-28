@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Square, Activity } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Phone, Mail, MapPin, User, Stethoscope, Calendar, Plus, History, Square, Activity, ChevronRight, StopCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { format } from 'date-fns';
@@ -10,14 +10,14 @@ import MedicalReportGenerator from '../components/patients/MedicalReportGenerato
 import MedicalHistoryModal from '../components/patients/MedicalHistoryModal';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
 import EditPatientModal from '../components/patients/EditPatientModal';
-import Badge from '../components/common/Badge';
 import LogViewPopup from '../components/patients/LogViewPopup';
+import Badge from '../components/common/Badge';
 import './PatientProfilePage.css';
 
 export default function PatientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isDoctor } = useAuth();
+  const { isDoctor, user } = useAuth();
   const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs, appointments, stopMedication, editMedication, refreshData } = useData();
 
   const patient = getPatientById(id);
@@ -27,6 +27,7 @@ export default function PatientProfilePage() {
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [selectedLogDate, setSelectedLogDate] = useState(null);
   const [selectedLogsForPopup, setSelectedLogsForPopup] = useState([]);
+  const [endingSession, setEndingSession] = useState(false);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
@@ -42,6 +43,9 @@ export default function PatientProfilePage() {
   const isApptToday   = activeAppt && activeAppt.date === format(new Date(), 'yyyy-MM-dd');
   const hasActiveSession = activeApptId && activePatId === id && isApptToday;
 
+  // Check if we arrived from a started appointment redirect
+  const redirectApptId = sessionStorage.getItem('active_appt_id');
+
   React.useEffect(() => {
     if (activeApptId && activeAppt && activeAppt.date !== format(new Date(), 'yyyy-MM-dd')) {
       sessionStorage.removeItem('activeAppointmentId');
@@ -55,6 +59,14 @@ export default function PatientProfilePage() {
     }
     sessionStorage.removeItem('activeAppointmentId');
     sessionStorage.removeItem('activePatientId');
+    navigate('/appointments');
+  };
+
+  const handleEndSession = async () => {
+    if (!redirectApptId) return;
+    setEndingSession(true);
+    await updateAppointment(redirectApptId, { status: 'Completed' });
+    sessionStorage.removeItem('active_appt_id');
     navigate('/appointments');
   };
 
@@ -75,25 +87,50 @@ export default function PatientProfilePage() {
 
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+      {/* Top navigation bar with optional Stop Session or End Session button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={()=>navigate(-1)}>
           <ArrowLeft size={14}/> Back
         </button>
-        {hasActiveSession && (
-          <button
-            onClick={stopSession}
-            style={{
-              display:'flex', alignItems:'center', gap:6,
-              background:'#dc2626', color:'#fff',
-              border:'none', borderRadius:8, padding:'7px 14px',
-              fontSize:13, fontWeight:700, cursor:'pointer',
-              boxShadow:'0 2px 8px rgba(220,38,38,0.3)'
-            }}
-            title="End this appointment session"
-          >
-            <Square size={13} fill="currentColor"/> Stop Session
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {hasActiveSession && (
+            <button
+              onClick={stopSession}
+              style={{
+                display:'flex', alignItems:'center', gap:6,
+                background:'#dc2626', color:'#fff',
+                border:'none', borderRadius:8, padding:'7px 14px',
+                fontSize:13, fontWeight:700, cursor:'pointer',
+                boxShadow:'0 2px 8px rgba(220,38,38,0.3)'
+              }}
+              title="End this appointment session"
+            >
+              <Square size={13} fill="currentColor"/> Stop Session
+            </button>
+          )}
+          {redirectApptId && isDoctor && (
+            <button
+              onClick={handleEndSession}
+              disabled={endingSession}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '9px 18px',
+                background: 'var(--accent-red)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: 700, fontSize: 13.5,
+                cursor: endingSession ? 'not-allowed' : 'pointer',
+                opacity: endingSession ? 0.7 : 1,
+                boxShadow: '0 2px 8px rgba(239,68,68,0.35)',
+                transition: 'var(--transition)'
+              }}
+            >
+              <StopCircle size={16}/>
+              {endingSession ? 'Ending...' : 'End Session'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="profile-layout">
