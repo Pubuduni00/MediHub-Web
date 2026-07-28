@@ -82,7 +82,10 @@ export default function EditDoctorModal({ isOpen, onClose, doctor }) {
             <div className="form-group">
               <label className="form-label">Email Address *</label>
               <input type="email" className={`form-control ${errors.email ? 'border-danger' : ''}`} value={form.email || ''} onChange={e => set('email', e.target.value)} placeholder="doctor@medihub.com" />
-              {errors.email && <p style={{ color: 'var(--accent-red)', fontSize: 11.5, marginTop: 3 }}>{errors.email}</p>}
+              {errors.email && <p style={{ color:'var(--accent-red)',fontSize:11.5,marginTop:3 }}>{errors.email}</p>}
+              <p style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:4 }}>
+                ⚠️ This email is used for Google login. Changing it means the doctor must sign in with the new email.
+              </p>
             </div>
             <div className="form-group">
               <label className="form-label">Specialty</label>

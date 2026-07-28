@@ -59,7 +59,12 @@ export default function AddDoctorModal({ isOpen, onClose }) {
             <strong>{saved.name}</strong> has been registered with Employee ID{' '}
             <span style={{ color:'var(--primary)', fontWeight:700, fontFamily:'monospace' }}>{saved.id}</span>
           </p>
-          <p style={{ color:'var(--text-muted)', fontSize:12.5, marginTop:8 }}>An invitation email will be sent to {saved.email} once the backend is configured.</p>
+          <div style={{ marginTop:12, background:'var(--primary-light)', borderRadius:'var(--radius-md)', padding:'10px 16px', textAlign:'left' }}>
+            <p style={{ color:'var(--primary)', fontSize:12.5, fontWeight:600, marginBottom:4 }}>✅ Google Authentication Ready</p>
+            <p style={{ color:'var(--text-muted)', fontSize:12 }}>
+              The doctor can now sign into the MediHub portal by clicking <strong>"Continue with Google"</strong> using the email address: <strong>{saved.email}</strong>
+            </p>
+          </div>
         </div>
       ) : (
         <div>

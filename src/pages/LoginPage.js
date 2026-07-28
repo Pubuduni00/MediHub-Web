@@ -52,54 +52,57 @@ export default function LoginPage() {
 
           {/* Role Tabs */}
           <div className="role-tabs">
-            <button className={`role-tab ${role==='doctor'?'active':''}`} onClick={()=>{setRole('doctor');setError('');}}>
-              <Stethoscope size={15}/> Doctor
+            <button className={`role-tab ${role === 'doctor' ? 'active' : ''}`} onClick={() => { setRole('doctor'); setError(''); }}>
+              <Stethoscope size={15} /> Doctor
             </button>
-            <button className={`role-tab ${role==='staff'?'active':''}`} onClick={()=>{setRole('staff');setError('');}}>
-              <Users size={15}/> Staff
+            <button className={`role-tab ${role === 'staff' ? 'active' : ''}`} onClick={() => { setRole('staff'); setError(''); }}>
+              <Users size={15} /> Staff
             </button>
           </div>
 
           {error && (
-            <div className="login-error"><AlertCircle size={15}/> {error}</div>
+            <div className="login-error"><AlertCircle size={15} /> {error}</div>
           )}
 
-          {role==='doctor' && (
+          {role === 'doctor' && (
             <div>
-              <p style={{fontSize:13.5,color:'var(--text-muted)',marginBottom:20,lineHeight:1.6}}>
-                Doctors sign in using their hospital Google account. Contact administration if you don't have access.
+              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+                {/*Doctors must sign in using the Google account that matches their <strong>hospital-registered email</strong>.Contact administration if your email has not been registered yet.*/}
               </p>
               <GoogleLoginButton />
             </div>
           )}
 
-          {role==='staff' && (
+          {role === 'staff' && (
             <form onSubmit={handleStaffLogin}>
               <div className="form-group">
                 <label className="form-label">Email Address</label>
-                <div style={{position:'relative'}}>
-                  <input type="email" className="form-control" value={email} onChange={e=>setEmail(e.target.value)} placeholder="staff@medihub.com" style={{paddingLeft:38}} required/>
-                  <Users size={15} style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)'}}/>
+                <div style={{ position: 'relative' }}>
+                  <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@medihub.com" style={{ paddingLeft: 38 }} required />
+                  <Users size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Password</label>
-                <div style={{position:'relative'}}>
-                  <input type={showPass?'text':'password'} className="form-control" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter your password" style={{paddingLeft:38,paddingRight:40}} required/>
-                  <Lock size={15} style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)'}}/>
-                  <button type="button" onClick={()=>setShowPass(s=>!s)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)'}}>
-                    {showPass?<EyeOff size={15}/>:<Eye size={15}/>}
+                <div style={{ position: 'relative' }}>
+                  <input type={showPass ? 'text' : 'password'} className="form-control" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" style={{ paddingLeft: 38, paddingRight: 40 }} required />
+                  <Lock size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <button type="button" onClick={() => setShowPass(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading} style={{width:'100%',justifyContent:'center'}}>
-                {loading?'Signing in...':'Sign In'}
+              <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading} style={{ width: '100%', justifyContent: 'center' }}>
+                {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
           )}
 
-          <p style={{marginTop:28,fontSize:12,color:'var(--text-muted)',textAlign:'center'}}>
+          {/*<p style={{marginTop:28,fontSize:12,color:'var(--text-muted)',textAlign:'center'}}>
             Having trouble signing in? Contact <span style={{color:'var(--primary)',cursor:'pointer'}}>IT Support</span>
+          </p>*/}
+          <p style={{ marginTop: 28, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            Contact administration if your email has not been registered yet.
           </p>
         </div>
       </div>
