@@ -1,113 +1,482 @@
-.appts-layout { display: flex; flex-direction: column; gap: 20px; }
+/* Appointments Layout */
+.appts-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 
-/* Two-column layout */
+/* Stats Cards Grid */
+.appts-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.appt-stat-card {
+  background: var(--bg-white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.appt-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
+}
+
+.appt-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Specific theme classes for stats card icons */
+.appt-stat-icon.total { background: var(--primary-light); color: var(--primary); }
+.appt-stat-icon.confirmed { background: var(--accent-green-light); color: var(--accent-green); }
+.appt-stat-icon.pending { background: var(--accent-orange-light); color: var(--accent-orange); }
+.appt-stat-icon.completed { background: var(--secondary-light); color: var(--secondary); }
+
+.appt-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.appt-stat-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.appt-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+/* Main Grid Layout */
 .appts-main-grid {
   display: grid;
-  grid-template-columns: 1fr 248px;
-  gap: 16px;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
   align-items: start;
 }
 
+/* Appointments Section Header */
 .appts-day-header {
-  display: flex; align-items: center;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 18px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-/* ── Table — auto layout, let browser size columns naturally ── */
-.appts-table-wrap { width: 100%; overflow: hidden; }
-
-.appts-table-wrap table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: auto;       /* KEY: let content decide widths */
+/* Tab filter redesign */
+.appts-filter-tabs {
+  display: flex;
+  background: var(--bg-base);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  gap: 2px;
 }
 
-.appts-table-wrap thead tr { background: var(--bg-base); }
-
-.appts-table-wrap th {
-  padding: 9px 10px;
-  text-align: left;
-  font-size: 11px; font-weight: 700;
+.appts-filter-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.appts-table-wrap td {
-  padding: 10px 10px;
+.appts-filter-btn:hover {
+  color: var(--text-primary);
+}
+
+.appts-filter-btn.active {
+  background: var(--bg-white);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Appointment Cards Stack */
+.appt-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appt-row-card {
+  position: relative;
+  background: var(--bg-white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  padding-left: 28px;
+  transition: var(--transition);
+  overflow: hidden;
+  gap: 16px;
+}
+
+.appt-row-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(10, 110, 189, 0.15);
+}
+
+/* Status Vertical Indicator Bar */
+.appt-status-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  transition: var(--transition);
+}
+
+.appt-status-indicator.confirmed { background: var(--accent-green); }
+.appt-status-indicator.pending { background: var(--accent-orange); }
+.appt-status-indicator.completed { background: var(--accent-green); }
+.appt-status-indicator.cancelled { background: var(--accent-red); }
+.appt-status-indicator.missed { background: var(--accent-red); }
+
+/* Time Block */
+.appt-time-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.appt-time-value {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.appt-time-duration {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Patient / Doctor Details Block */
+.appt-info-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.appt-info-block.patient {
+  flex: 1.5;
+  min-width: 150px;
+}
+
+.appt-info-block.doctor {
+  flex: 1.2;
+  min-width: 130px;
+}
+
+.appt-type-badge-container {
+  width: 110px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.appt-status-pill-container {
+  width: 110px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.appt-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), #cbdff2);
+  color: var(--primary);
+  font-weight: 700;
   font-size: 13px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1.5px solid #fff;
+  box-shadow: 0 2px 4px rgba(10, 110, 189, 0.08);
 }
 
-/* Patient name column is the only one that can shrink */
-.appts-table-wrap td.col-patient {
+.appt-avatar.doctor {
+  background: linear-gradient(135deg, var(--secondary-light), #cbeff2);
+  color: var(--secondary);
+}
+
+.appt-text-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.appt-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
 }
 
-.appts-table-wrap tbody tr:last-child td { border-bottom: none; }
-.appts-table-wrap tbody tr:hover { background: var(--primary-light); }
+.appt-subtext {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin-top: 2px;
+}
 
-/* Status pill */
-.appts-status-pill {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 20px;
-  font-size: 12px; font-weight: 600;
+.appt-doctor-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.appt-doc-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
   white-space: nowrap;
-}
-.appts-status-pill.confirmed {
-  background: var(--accent-green-light);
-  color: var(--accent-green);
-}
-.appts-status-pill.pending {
-  background: var(--accent-orange-light);
-  color: var(--accent-orange);
-}
-.appts-status-pill.cancelled {
-  background: var(--accent-red-light);
-  color: var(--accent-red);
-}
-.appts-status-pill.missed {
-  background: var(--accent-red-light);
-  color: var(--accent-red);
-}
-.appts-status-pill.completed {
-  background: var(--accent-green-light);
-  color: var(--accent-green);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Edit button */
-.appts-edit-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: var(--radius-sm);
+/* Badges and pills */
+.appt-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  justify-content: center;
+  width: fit-content;
+}
+
+/* Status Pill */
+.appt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.appt-status-pill.confirmed { background: var(--accent-green-light); color: var(--accent-green); }
+.appt-status-pill.pending { background: var(--accent-orange-light); color: var(--accent-orange); }
+.appt-status-pill.completed { background: var(--accent-green-light); color: var(--accent-green); }
+.appt-status-pill.cancelled { background: var(--accent-red-light); color: var(--accent-red); }
+.appt-status-pill.missed { background: var(--accent-red-light); color: var(--accent-red); }
+
+/* Action buttons wrapper */
+.appt-actions-cell {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.appt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
   border: 1.5px solid var(--border);
   background: var(--bg-white);
-  cursor: pointer; color: var(--text-secondary);
+  cursor: pointer;
+  color: var(--text-secondary);
   transition: var(--transition);
   flex-shrink: 0;
 }
-.appts-edit-btn:hover:not(:disabled) {
+
+.appt-btn:hover:not(:disabled) {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-light);
 }
-.appts-edit-btn:disabled {
-  opacity: 0.3; cursor: not-allowed;
+
+.appt-btn.danger:hover:not(:disabled) {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+  background: var(--accent-red-light);
 }
 
-/* Mini calendar sticky */
+.appt-btn.success-start {
+  width: auto;
+  padding: 0 12px;
+  background: var(--accent-green);
+  color: #fff;
+  border-color: var(--accent-green);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.appt-btn.success-start:hover:not(:disabled) {
+  background: #219a52;
+  border-color: #219a52;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.appt-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Mini Calendar Sticky and Polish */
 .appts-mini-calendar {
   position: sticky;
   top: calc(var(--topbar-height) + 16px);
 }
 
+.cal-day-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 32px;
+  position: relative;
+}
+
+.cal-day-cell.other-month {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.cal-day-cell:hover:not(.other-month):not(.selected) {
+  background: var(--primary-light);
+}
+
+.cal-day-cell.selected {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 4px 10px rgba(10, 110, 189, 0.25);
+}
+
+.cal-day-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  position: absolute;
+  bottom: 4px;
+}
+
+.cal-day-cell.selected .cal-day-dot {
+  background: #fff;
+  opacity: 0.8;
+}
+
+/* Responsiveness adjustments */
+@media (max-width: 1200px) {
+  .appt-row-card {
+    padding: 14px 16px;
+    padding-left: 22px;
+    gap: 12px;
+  }
+  .appt-info-block.patient {
+    min-width: 130px;
+  }
+  .appt-info-block.doctor {
+    min-width: 110px;
+  }
+  .appt-actions-cell {
+    width: 130px;
+  }
+}
+
 @media (max-width: 1060px) {
-  .appts-main-grid { grid-template-columns: 1fr; }
-  .appts-mini-calendar { position: static; }
+  .appts-main-grid {
+    grid-template-columns: 1fr;
+  }
+  .appts-mini-calendar {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .appt-row-card {
+    display: grid;
+    grid-template-columns: 80px 1fr 120px;
+    grid-template-areas: 
+      "time patient status"
+      "time doctor type"
+      "actions actions actions";
+    gap: 12px;
+    padding-left: 20px;
+  }
+
+  .appt-time-block { grid-area: time; }
+  .appt-info-block { grid-area: patient; }
+  .appt-doctor-block { grid-area: doctor; }
+  .appt-type-badge { grid-area: type; margin-left: 0; }
+  .appt-status-pill { grid-area: status; justify-self: flex-end; }
+  .appt-actions-cell { grid-area: actions; justify-content: flex-start; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+}
+
+@media (max-width: 768px) {
+  .appts-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .appts-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .appt-row-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: 
+      "status"
+      "time"
+      "patient"
+      "doctor"
+      "type"
+      "actions";
+    gap: 8px;
+    padding-left: 16px;
+  }
+  .appt-status-pill { justify-self: flex-start; }
+  .appt-actions-cell { justify-content: flex-end; }
 }

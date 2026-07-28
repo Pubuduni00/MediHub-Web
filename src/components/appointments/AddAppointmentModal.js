@@ -3,6 +3,7 @@ import Modal from '../common/Modal';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Calendar } from 'lucide-react';
+import { format } from 'date-fns';
 
 const EMPTY = { patientId:'', doctorId:'', date:'', time:'', type:'Consultation', details:'', duration:15 };
 const TYPES = ['Consultation','Follow-up','Review','Emergency','Procedure','Lab Visit'];
@@ -13,6 +14,7 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
   const [form, setForm] = useState({ ...EMPTY, date: prefillDate, doctorId: isDoctor ? user?.id : '' });
   const [errors, setErrors] = useState({});
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
@@ -29,7 +31,17 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
       setLoadingSlots(true);
       const res = await fetch(`http://localhost:5000/api/doctors/${docId}/availability?date=${dateStr}`);
       const data = await res.json();
-      setAvailableSlots(data.filter(s => !s.isBooked));
+      
+      let slots = data.filter(s => !s.isBooked);
+      
+      // Filter out past slots if the selected date is today
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      if (dateStr === todayStr) {
+        const currentTimeStr = format(new Date(), 'HH:mm');
+        slots = slots.filter(s => s.time > currentTimeStr);
+      }
+      
+      setAvailableSlots(slots);
     } catch (e) {
       console.error(e);
     } finally {
@@ -51,13 +63,20 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
   const handleSave = async () => {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    const patient = patients.find(p=>p.id===form.patientId);
-    const doctor = doctors.find(d=>d.id===form.doctorId) || { name: user?.name };
-    await addAppointment({ ...form, patientName: patient?.name||'', doctorName: doctor?.name||'', status:'Confirmed' });
-    setSaved(true);
+    setSubmitting(true);
+    try {
+      const patient = patients.find(p=>p.id===form.patientId);
+      const doctor = doctors.find(d=>d.id===form.doctorId) || { name: user?.name };
+      await addAppointment({ ...form, patientName: patient?.name||'', doctorName: doctor?.name||'', status:'Confirmed' });
+      setSaved(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleClose = () => { setSaved(false); setForm({...EMPTY, date:prefillDate, doctorId: isDoctor ? user?.id : ''}); setErrors({}); onClose(); };
+  const handleClose = () => { setSaved(false); setSubmitting(false); setForm({...EMPTY, date:prefillDate, doctorId: isDoctor ? user?.id : ''}); setErrors({}); onClose(); };
 
   return (
     <Modal
@@ -68,8 +87,12 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
       footer={
         saved
           ? <button className="btn btn-primary" onClick={handleClose}>Done</button>
-          : <><button className="btn btn-ghost" onClick={handleClose}>Cancel</button>
-             <button className="btn btn-primary" onClick={handleSave}><Calendar size={14}/> Confirm Appointment</button></>
+          : <>
+              <button className="btn btn-ghost" onClick={handleClose} disabled={submitting}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+                {submitting ? 'Confirming...' : <><Calendar size={14}/> Confirm Appointment</>}
+              </button>
+            </>
       }
     >
       {saved ? (
@@ -112,7 +135,7 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Date *</label>
-              <input type="date" className={`form-control ${errors.date?'border-danger':''}`} value={form.date} onChange={e=>set('date',e.target.value)} min={new Date().toISOString().split('T')[0]}/>
+              <input type="date" className={`form-control ${errors.date?'border-danger':''}`} value={form.date} onChange={e=>set('date',e.target.value)} min={format(new Date(), 'yyyy-MM-dd')}/>
               {errors.date&&<p style={{color:'var(--accent-red)',fontSize:11.5,marginTop:3}}>{errors.date}</p>}
             </div>
             <div className="form-group">
