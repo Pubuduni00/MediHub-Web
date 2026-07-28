@@ -17,6 +17,23 @@ const FREQ       = ['Once daily','Twice daily','Three times daily','Four times d
 const MEAL       = ['Before meals','After meals','With meals','On empty stomach','No restriction'];
 const INV_STATUS = ['Normal','Abnormal','Pending','Critical'];
 
+const SectionLabel = ({ children }) => (
+  <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--text-muted)', margin:'16px 0 10px', paddingBottom:6, borderBottom:'1px solid var(--border)' }}>
+    {children}
+  </p>
+);
+
+const SystemCard = ({ title, field, placeholder, color, exam, onChange }) => (
+  <div style={{ background:'var(--bg-base)', borderRadius:'var(--radius-md)', padding:'12px 14px', marginBottom:10, border:'1px solid var(--border)' }}>
+    <p style={{ fontSize:12.5, fontWeight:700, color, marginBottom:8 }}>{title}</p>
+    <textarea className="form-control" rows={2}
+      value={exam[field]||''}
+      onChange={e=>onChange(field,e.target.value)}
+      placeholder={placeholder}
+    />
+  </div>
+);
+
 export default function PatientLogModal({ isOpen, onClose, patientId }) {
   const { addPatientLog } = useData();
   const { user } = useAuth();
@@ -73,22 +90,6 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
     { id:'invest', label:'Investigations', icon:FlaskConical },
   ];
 
-  const SectionLabel = ({ children }) => (
-    <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--text-muted)', margin:'16px 0 10px', paddingBottom:6, borderBottom:'1px solid var(--border)' }}>
-      {children}
-    </p>
-  );
-
-  const SystemCard = ({ title, field, placeholder, color }) => (
-    <div style={{ background:'var(--bg-base)', borderRadius:'var(--radius-md)', padding:'12px 14px', marginBottom:10, border:'1px solid var(--border)' }}>
-      <p style={{ fontSize:12.5, fontWeight:700, color, marginBottom:8 }}>{title}</p>
-      <textarea className="form-control" rows={2}
-        value={exam[field]||''}
-        onChange={e=>setE(field,e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  );
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Patient Log Entry" size="xl"
@@ -145,36 +146,48 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                 field="cardiovascular"
                 color="var(--primary)"
                 placeholder="Heart sounds, murmurs, pulse character, JVP, peripheral pulses, apex beat..."
+                exam={exam}
+                onChange={setE}
               />
               <SystemCard
                 title="Respiratory System (RS)"
                 field="respiratory"
                 color="var(--secondary)"
                 placeholder="Air entry, breath sounds, wheeze, crepitations, percussion note, respiratory rate..."
+                exam={exam}
+                onChange={setE}
               />
               <SystemCard
                 title="Nervous System (CNS)"
                 field="nervous"
                 color="#7C3AED"
                 placeholder="GCS, cranial nerves, motor and sensory function, reflexes, coordination, gait..."
+                exam={exam}
+                onChange={setE}
               />
               <SystemCard
                 title="Locomotor System"
                 field="locomotor"
                 color="#B45309"
                 placeholder="Joints, range of motion, swelling, tenderness, muscle power, tone..."
+                exam={exam}
+                onChange={setE}
               />
               <SystemCard
                 title="Gastrointestinal System (GIT)"
                 field="gastrointestinal"
                 color="#059669"
                 placeholder="Abdomen inspection, palpation, bowel sounds, organomegaly, tenderness..."
+                exam={exam}
+                onChange={setE}
               />
               <SystemCard
                 title="Additional Examination"
                 field="additional"
                 color="var(--text-secondary)"
                 placeholder="Any other system or additional findings..."
+                exam={exam}
+                onChange={setE}
               />
 
               <SectionLabel>Assessment & Plan</SectionLabel>
