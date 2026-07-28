@@ -11,19 +11,22 @@ import MedicalHistoryModal from '../components/patients/MedicalHistoryModal';
 import AddAppointmentModal from '../components/appointments/AddAppointmentModal';
 import EditPatientModal from '../components/patients/EditPatientModal';
 import Badge from '../components/common/Badge';
+import LogViewPopup from '../components/patients/LogViewPopup';
 import './PatientProfilePage.css';
 
 export default function PatientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isDoctor } = useAuth();
-  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs, appointments, refreshData } = useData();
+  const { getPatientById, getLogsForPatient, getPrescriptionsForPatient, doctors, updateAppointment, symptomLogs, appointments, stopMedication, editMedication, refreshData } = useData();
 
   const patient = getPatientById(id);
   const [showLog,     setShowLog]     = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAppt,    setShowAppt]    = useState(false);
   const [showEditPatient, setShowEditPatient] = useState(false);
+  const [selectedLogDate, setSelectedLogDate] = useState(null);
+  const [selectedLogsForPopup, setSelectedLogsForPopup] = useState([]);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
@@ -283,25 +286,26 @@ export default function PatientProfilePage() {
           <div className="card">
             <div className="card-header">
               <h3 className="card-title">Recent Logs</h3>
-              {isDoctor && (
-                <button className="btn btn-primary btn-sm" onClick={()=>setShowLog(true)}>
-                  <ClipboardList size={13}/> Add Log
-                </button>
-              )}
             </div>
             {logs.length===0 ? (
               <p style={{ color:'var(--text-muted)', fontSize:13.5, padding:'12px 0' }}>No logs recorded yet.</p>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {logs.slice().reverse().slice(0,5).map(log=>(
-                  <div key={log.id} style={{ padding:'12px 14px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                      <p style={{ fontWeight:600, fontSize:13.5 }}>{log.examination?.diagnosis||'Log Entry'}</p>
-                      <span style={{ fontSize:12, color:'var(--text-muted)' }}>{log.date}</span>
+                  <div key={log.id} 
+                    className="clickable-log-item"
+                    onClick={() => {
+                      setSelectedLogDate(log.date);
+                      setSelectedLogsForPopup([log]);
+                    }}
+                    style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}
+                  >
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <span style={{ fontWeight:600, fontSize:13, color:'var(--text-primary)' }}>{log.date}</span>
+                      <span style={{ fontSize:12, color:'var(--text-muted)' }}>
+                        {log.drugs?.length||0} drug(s) · {log.investigations?.length||0} investigation(s)
+                      </span>
                     </div>
-                    <p style={{ fontSize:12.5, color:'var(--text-muted)' }}>
-                      {log.doctorName} · {log.drugs?.length||0} drug(s) · {log.investigations?.length||0} investigation(s)
-                    </p>
                   </div>
                 ))}
               </div>
@@ -320,29 +324,26 @@ export default function PatientProfilePage() {
             {patientSymptomLogs.length === 0 ? (
               <p style={{ color:'var(--text-muted)', fontSize:13.5, padding:'12px 0' }}>No symptom logs submitted from mobile app yet.</p>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {patientSymptomLogs.slice().reverse().map(log => {
                   const dateStr = log.date ? format(new Date(log.date), 'yyyy-MM-dd HH:mm') : '—';
                   const severityVariant = log.severity === 'Severe' ? 'danger' : log.severity === 'Moderate' ? 'warning' : 'success';
                   return (
-                    <div key={log.id} style={{ padding:'12px 14px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}>
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    <div key={log.id} style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:6 }}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
                           {(log.symptoms || []).map((s, i) => (
                             <span key={i} style={{ fontSize:11.5, background:'var(--bg-white)', border:'1px solid var(--border)', padding:'1px 6px', borderRadius:10 }}>
                               {s}
                             </span>
                           ))}
+                          <Badge label={log.severity} variant={severityVariant} />
                         </div>
                         <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>{dateStr}</span>
                       </div>
                       {log.notes && (
-                        <p style={{ fontSize:12.5, fontStyle:'italic', color:'var(--text-secondary)', marginBottom:6 }}>"{log.notes}"</p>
+                        <p style={{ fontSize:12, fontStyle:'italic', color:'var(--text-secondary)', marginTop:4, marginBottom:0 }}>"{log.notes}"</p>
                       )}
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>via {log.reportedVia || 'Mobile App'}</span>
-                        <Badge label={log.severity} variant={severityVariant} />
-                      </div>
                     </div>
                   );
                 })}
@@ -350,32 +351,50 @@ export default function PatientProfilePage() {
             )}
           </div>
 
-          {/* Prescriptions — from drug chart, view only */}
+          {/* Prescriptions — compact changelog summary */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">Prescriptions</h3>
+              <h3 className="card-title">Prescriptions / Drug Changes</h3>
             </div>
             {prescriptions.length===0 ? (
               <p style={{ color:'var(--text-muted)', fontSize:13.5, padding:'12px 0' }}>
                 No prescriptions added yet. Prescriptions are added through the Drug Chart in Patient Log.
               </p>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 {prescriptions.slice().reverse().map(rx=>(
-                  <div key={rx.id} style={{ padding:'12px 14px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                      <span style={{ fontWeight:600, fontSize:13 }}>Prescription {rx.id}</span>
-                      <span style={{ fontSize:12, color:'var(--text-muted)' }}>{rx.date}</span>
+                  <div key={rx.id} style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                      <span style={{ fontWeight:700, fontSize:12.5, color:'var(--primary)' }}>{rx.date}</span>
                     </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                      {rx.drugs?.map((d,i)=>(
-                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                          <span style={{ fontWeight:600, fontSize:13 }}>{d.drug}</span>
-                          <span className="badge badge-secondary">{d.dose}</span>
-                          <span style={{ fontSize:12, color:'var(--text-muted)' }}>{d.frequency} · {d.duration}</span>
-                          <span className="badge badge-muted">{d.mealInstruction}</span>
-                        </div>
-                      ))}
+                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      {rx.drugs && rx.drugs.length > 0 ? (
+                        rx.drugs.map((d,i)=>{
+                          const isStopped = d.changeType === 'Stopped' || !!d.endDate;
+                          const isModified = d.changeType === 'Modified';
+                          
+                          return (
+                            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5 }}>
+                              {isStopped ? (
+                                <span style={{ color:'var(--accent-red)', fontWeight:500 }}>
+                                  🛑 Stopped: <span style={{ textDecoration:'line-through', color:'var(--text-primary)' }}>{d.drug}</span>
+                                </span>
+                              ) : isModified ? (
+                                <span style={{ color:'var(--accent-orange)', fontWeight:500 }}>
+                                  🔄 Modified: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} · {d.frequency})
+                                </span>
+                              ) : (
+                                <span style={{ color:'var(--accent-green)', fontWeight:500 }}>
+                                  ➕ Added: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} · {d.frequency} · {d.duration})
+                                </span>
+                              )}
+                              {d.notes && <span style={{ fontSize:11, color:'var(--text-muted)', fontStyle:'italic' }}>({d.notes})</span>}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <span style={{ fontSize:12.5, color:'var(--text-muted)' }}>No drug changes in this appointment.</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -389,6 +408,13 @@ export default function PatientProfilePage() {
       <MedicalHistoryModal isOpen={showHistory} onClose={()=>setShowHistory(false)} patientId={id} existingHistory={patient.medicalHistory}/>
       <AddAppointmentModal isOpen={showAppt}   onClose={()=>setShowAppt(false)}   prefillDate={format(new Date(),'yyyy-MM-dd')}/>
       <EditPatientModal    isOpen={showEditPatient} onClose={()=>setShowEditPatient(false)} patient={patient}/>
+      {selectedLogDate && (
+        <LogViewPopup
+          logs={selectedLogsForPopup}
+          date={selectedLogDate}
+          onClose={() => { setSelectedLogDate(null); setSelectedLogsForPopup([]); }}
+        />
+      )}
     </div>
   );
 }
