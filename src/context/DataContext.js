@@ -164,6 +164,21 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const deleteAppointment = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/appointments/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setAppointments(prev => prev.filter(a => a.id !== id));
+        return true;
+      }
+    } catch (err) {
+      console.error("Failed to delete appointment:", err);
+    }
+    return false;
+  };
+
   const getAppointmentsForDate = (date) => appointments.filter(a => a.date === date);
   const getAppointmentsForDoctor = (doctorId) => appointments.filter(a => a.doctorId === doctorId);
 
@@ -318,6 +333,23 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const updateDoctor = async (id, updates) => {
+    try {
+      const res = await fetch(`${API_URL}/doctors/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const updatedDoc = await res.json();
+        setDoctors(prev => prev.map(d => d.id === id ? updatedDoc : d));
+        return updatedDoc;
+      }
+    } catch (err) {
+      console.error("Failed to update doctor:", err);
+    }
+  };
+
   // ── Alerts ──
   const markAlertRead = async (id) => {
     try {
@@ -351,10 +383,10 @@ export const DataProvider = ({ children }) => {
     <DataContext.Provider value={{
       patients, doctors, appointments, patientLogs, prescriptions, alerts, symptomLogs, loading,
       addPatient, updatePatient, syncPatientToMobile, getPatientById, assignPatientToDoctor, getPatientsForDoctor,
-      addAppointment, updateAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
+      addAppointment, updateAppointment, deleteAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient, stopMedication, editMedication, refreshData,
-      addDoctor, setDoctors, setAppointments,
+      addDoctor, updateDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
     }}>
