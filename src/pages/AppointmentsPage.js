@@ -171,7 +171,7 @@ export default function AppointmentsPage() {
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."/>
               </div>
               <div className="appts-filter-tabs">
-                {['All','Confirmed','Pending','Completed'].map(f=>(
+                {['All','Confirmed','Pending','Completed','Missed'].map(f=>(
                   <button key={f} onClick={()=>setFilterStatus(f)}
                     className={`appts-filter-btn ${filterStatus===f ? 'active' : ''}`}>
                     {f}
@@ -241,7 +241,7 @@ export default function AppointmentsPage() {
 
                     {/* Action buttons cell */}
                     <div className="appt-actions-cell">
-                      {isDoctor && a.status !== 'Completed' && a.status !== 'Cancelled' && a.status !== 'Missed' && !isPastDate(a.date) && (
+                      {isDoctor && a.status !== 'Completed' && a.status !== 'Cancelled' && a.status !== 'Missed' && isToday(parseISO(a.date)) && (
                         <button
                           className="appt-btn success-start"
                           onClick={() => handleStartAppointment(a)}
