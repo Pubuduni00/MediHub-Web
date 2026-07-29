@@ -27,8 +27,21 @@ const camelCaseMap = {
   logid: 'logId',
   addedby: 'addedBy',
   reportedvia: 'reportedVia',
-  firebase_uid: 'firebaseUid',    // ← NEW
-  firebaseuid: 'firebaseUid',     // ← NEW
+  firebase_uid: 'firebaseUid',
+  firebaseuid: 'firebaseUid',
+  appointmentid: 'appointmentId',
+  requesteddate: 'requestedDate',
+  requestedtime: 'requestedTime',
+  staffmessage: 'staffMessage',
+  suggesteddate: 'suggestedDate',
+  suggestedtime: 'suggestedTime',
+  createdat: 'createdAt',
+  olddate: 'oldDate',
+  oldtime: 'oldTime',
+  primarycondition: 'primaryCondition',
+  investigationnotes: 'investigationNotes',
+  patientphone: 'patientPhone',
+  patientemail: 'patientEmail',
 };
 
 function mapKeysToCamelCase(row) {
@@ -255,12 +268,27 @@ async function initDatabase() {
         requestedDate TEXT,
         requestedTime TEXT,
         status TEXT,
+        reason TEXT,
+        staffMessage TEXT,
+        suggestedDate TEXT,
+        suggestedTime TEXT,
         createdAt TEXT,
         FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE CASCADE,
         FOREIGN KEY (patientId) REFERENCES patients(id),
         FOREIGN KEY (doctorId) REFERENCES doctors(id)
       )
     `);
+
+    // Migrations for reschedule_requests — add columns if missing
+    const rrMigrations = [
+      'ALTER TABLE reschedule_requests ADD COLUMN IF NOT EXISTS reason TEXT',
+      'ALTER TABLE reschedule_requests ADD COLUMN IF NOT EXISTS staffMessage TEXT',
+      'ALTER TABLE reschedule_requests ADD COLUMN IF NOT EXISTS suggestedDate TEXT',
+      'ALTER TABLE reschedule_requests ADD COLUMN IF NOT EXISTS suggestedTime TEXT',
+    ];
+    for (const m of rrMigrations) {
+      try { await dbHelpers.run(m); } catch (e) { /* column exists */ }
+    }
 
     // Check if seed needed
     const staffCountResult = await dbHelpers.get('SELECT COUNT(*) as count FROM staff');
