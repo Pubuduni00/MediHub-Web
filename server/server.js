@@ -455,14 +455,18 @@ function initFirestoreListeners() {
                 );
                 if (!patient) continue;
                 const requestId = await generateNextId('reschedule_requests', 'RR');
+                // Store reason and requested slot if provided via Firestore
+                const reason = apptData.rescheduleNote || null;
+                const reqDate = apptData.rescheduleRequestedDate || null;
+                const reqTime = apptData.rescheduleRequestedTime || null;
                 await dbHelpers.run(
-                  'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                  [requestId, apptId, patient.id, appointment.doctorId, null, null, 'Pending', new Date().toISOString()]
+                  'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, reason, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [requestId, apptId, patient.id, appointment.doctorId, reqDate, reqTime, reason, 'Pending', new Date().toISOString()]
                 );
                 const alertId = await generateNextId('alerts', 'AL');
                 await dbHelpers.run(
                   'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                  [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule. Reason: ${apptData.rescheduleNote || 'Not specified'}`, 'warning', new Date().toISOString()]
+                  [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule to ${reqDate || 'TBD'} ${reqTime || ''}. Reason: ${reason || 'Not specified'}`, 'warning', new Date().toISOString()]
                 );
                 console.log(`[Listener] Reschedule request ${requestId} created for appointment ${apptId}`);
               }
@@ -488,13 +492,28 @@ function getLocalDateString() {
 }
 
 // Helper: auto-mark past appointments that were never completed as 'Missed'
+// Also marks today's appointments whose scheduled time has already passed.
 async function checkAndMarkMissedAppointments() {
   try {
+    const now = new Date();
     const todayStr = getLocalDateString();
-    const missedAppts = await dbHelpers.all(
+    // Current local time as HH:MM string for comparison
+    const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    // 1. All past-day appointments not yet resolved
+    const pastDayAppts = await dbHelpers.all(
       "SELECT * FROM appointments WHERE date < ? AND status NOT IN ('Completed', 'Cancelled', 'Missed')",
       [todayStr]
     );
+
+    // 2. Today's appointments whose time has already passed and are not yet resolved
+    const todayElapsedAppts = await dbHelpers.all(
+      "SELECT * FROM appointments WHERE date = ? AND time < ? AND status NOT IN ('Completed', 'Cancelled', 'Missed')",
+      [todayStr, nowTime]
+    );
+
+    const missedAppts = [...pastDayAppts, ...todayElapsedAppts];
+
     for (const appt of missedAppts) {
       console.log(`Marking appointment ${appt.id} as Missed`);
       await dbHelpers.run(
@@ -798,10 +817,34 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
     }
 
     const requestId = await generateNextId('reschedule_requests', 'RR');
-    await dbHelpers.run(
-      'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [requestId, appointment.id, patient.id, appointment.doctorId, requestedDate, requestedTime, 'Pending', new Date().toISOString()]
+    // Check for existing pending request for same appointment
+    const existingPending = await dbHelpers.get(
+      'SELECT id FROM reschedule_requests WHERE appointmentId = ? AND status = ?',
+      [appointment.id, 'Pending']
     );
+    if (existingPending) {
+      // Update the existing pending request with the new slot and reason
+      await dbHelpers.run(
+        'UPDATE reschedule_requests SET requestedDate = ?, requestedTime = ?, reason = ?, createdAt = ? WHERE id = ?',
+        [requestedDate, requestedTime, note || null, new Date().toISOString(), existingPending.id]
+      );
+    } else {
+      await dbHelpers.run(
+        'INSERT INTO reschedule_requests (id, appointmentId, patientId, doctorId, requestedDate, requestedTime, reason, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [requestId, appointment.id, patient.id, appointment.doctorId, requestedDate, requestedTime, note || null, 'Pending', new Date().toISOString()]
+      );
+    }
+
+    // Also update Firestore so the mobile app immediately shows pending status
+    if (db_firebase && patient.firebaseUid) {
+      await syncAppointmentToFirestore(patient.firebaseUid, appointment.id, {
+        rescheduleStatus: 'requested',
+        rescheduleRequestedAt: Date.now(),
+        rescheduleNote: note || '',
+        rescheduleRequestedDate: requestedDate,
+        rescheduleRequestedTime: requestedTime,
+      });
+    }
 
     // Create alert for staff
     const alertId = await generateNextId('alerts', 'AL');
@@ -810,13 +853,114 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
       [alertId, patient.id, patient.name, 'Reschedule', `${patient.name} requested appointment reschedule to ${requestedDate} ${requestedTime}. Reason: ${note || 'Not specified'}`, 'warning', new Date().toISOString()]
     );
 
-    return res.json({ success: true, requestId });
+    return res.json({ success: true, requestId: existingPending ? existingPending.id : requestId });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // â”€â”€ Patients Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+// ── NEW: Get available (unbooked) future slots for a doctor (for mobile rescheduling) ──────────────
+app.get('/api/mobile/available-slots', async (req, res) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey !== process.env.CLOUD_FUNCTION_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    let { doctorId, appointmentId, doctorName } = req.query;
+    console.log('[Available Slots Route] Received query:', req.query);
+
+    let targetDoctorId = doctorId && doctorId !== '_by_appt_' ? doctorId : null;
+
+    // 1. Try to find doctorId from appointmentId if provided
+    if (!targetDoctorId && appointmentId) {
+      const appt = await dbHelpers.get('SELECT doctorId, doctorName FROM appointments WHERE id = ?', [appointmentId]);
+      if (appt) {
+        targetDoctorId = appt.doctorId;
+        if (!doctorName) doctorName = appt.doctorName;
+        console.log(`[Available Slots Route] Resolved targetDoctorId=${targetDoctorId} from appointmentId=${appointmentId}`);
+      } else {
+        console.log(`[Available Slots Route] Appointment not found in DB by id=${appointmentId}`);
+      }
+    }
+
+    // 2. If targetDoctorId is still not found, try to look up doctor by doctorName
+    if (!targetDoctorId && doctorName) {
+      const cleanName = doctorName.replace(/^Dr\.\s*/i, '').trim();
+      const doc = await dbHelpers.get(
+        'SELECT id FROM doctors WHERE name = ? OR name = ? OR name LIKE ? OR name LIKE ?',
+        [doctorName, `Dr. ${cleanName}`, `%${cleanName}%`, `%${doctorName}%`]
+      );
+      if (doc) {
+        targetDoctorId = doc.id;
+        console.log(`[Available Slots Route] Resolved targetDoctorId=${targetDoctorId} from doctorName="${doctorName}"`);
+      } else {
+        console.log(`[Available Slots Route] Doctor name "${doctorName}" not found in DB`);
+      }
+    }
+
+    // 3. If targetDoctorId is STILL not found, search for any doctor with availability in DB
+    if (!targetDoctorId) {
+      const availDoc = await dbHelpers.get('SELECT DISTINCT doctorId FROM doctor_availability LIMIT 1');
+      if (availDoc) {
+        targetDoctorId = availDoc.doctorId;
+        console.log(`[Available Slots Route] Resolved targetDoctorId=${targetDoctorId} (fallback to any doctor with availability)`);
+      }
+    }
+
+    const todayStr = getLocalDateString();
+    const now = new Date();
+    // Current local time as HH:MM for filtering past slots on today
+    const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    console.log('[Available Slots Route] Using todayStr:', todayStr, 'nowTime:', nowTime);
+
+    // 4. Query doctor_availability for targetDoctorId — only future dates
+    let slots = [];
+    if (targetDoctorId) {
+      slots = await dbHelpers.all(
+        'SELECT * FROM doctor_availability WHERE doctorId = ? AND date >= ? ORDER BY date ASC, time ASC',
+        [targetDoctorId, todayStr]
+      );
+      console.log(`[Available Slots Route] Slots with date >= ${todayStr}: ${slots.length}`);
+    }
+
+    // 5. If 0 slots for this doctor, fallback to ANY available slots across all doctors (future only)
+    if (slots.length === 0) {
+      slots = await dbHelpers.all(
+        'SELECT * FROM doctor_availability WHERE date >= ? ORDER BY date ASC, time ASC',
+        [todayStr]
+      );
+      console.log(`[Available Slots Route] Fallback slots across all doctors: ${slots.length}`);
+    }
+
+    // 6. Filter out booked slots, current appointment slot, and past times on today
+    const appts = targetDoctorId
+      ? await dbHelpers.all("SELECT date, time FROM appointments WHERE doctorId = ? AND status != 'Cancelled'", [targetDoctorId])
+      : [];
+    let currentApptSlot = null;
+    if (appointmentId) {
+      const currentAppt = await dbHelpers.get('SELECT date, time FROM appointments WHERE id = ?', [appointmentId]);
+      if (currentAppt) currentApptSlot = `${currentAppt.date}_${currentAppt.time}`;
+    }
+
+    const bookedSet = new Set(appts.map(a => `${a.date}_${a.time}`));
+    const availableSlots = slots.filter(slot => {
+      const key = `${slot.date}_${slot.time}`;
+      if (bookedSet.has(key)) return false;
+      if (key === currentApptSlot) return false;
+      // Filter out past time slots on today's date
+      if (slot.date === todayStr && slot.time <= nowTime) return false;
+      return true;
+    }).map(slot => ({ date: slot.date, time: slot.time }));
+
+    return res.json(availableSlots);
+  } catch (err) {
+    console.error('[Available Slots] Error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 app.get('/api/patients', async (req, res) => {
   try {
@@ -1186,9 +1330,13 @@ app.put('/api/appointments/:id', async (req, res) => {
 app.get('/api/reschedule-requests', async (req, res) => {
   try {
     const requests = await dbHelpers.all(`
-      SELECT r.*, a.date as oldDate, a.time as oldTime, a.patientName, a.doctorName 
+      SELECT r.*,
+             a.date as oldDate, a.time as oldTime,
+             a.patientName, a.doctorName,
+             p.phone as patientPhone, p.email as patientEmail
       FROM reschedule_requests r
       JOIN appointments a ON r.appointmentId = a.id
+      LEFT JOIN patients p ON r.patientId = p.id
     `);
     res.json(requests);
   } catch (err) {
@@ -1197,48 +1345,133 @@ app.get('/api/reschedule-requests', async (req, res) => {
 });
 
 app.put('/api/reschedule-requests/:id', async (req, res) => {
-  const { status } = req.body; // 'Approved' or 'Rejected'
-  if (!['Approved', 'Rejected'].includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
+  const { status, staffMessage, suggestedDate, suggestedTime } = req.body;
+
+  const validStatuses = ['Approved', 'Rejected', 'AlternativeSuggested'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Must be Approved, Rejected, or AlternativeSuggested' });
   }
+
   try {
     const request = await dbHelpers.get('SELECT * FROM reschedule_requests WHERE id = ?', [req.params.id]);
     if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (request.status !== 'Pending') {
+      return res.status(400).json({ error: 'Request is no longer pending' });
+    }
 
-    await dbHelpers.run('UPDATE reschedule_requests SET status = ? WHERE id = ?', [status, req.params.id]);
+    const patient = await dbHelpers.get('SELECT * FROM patients WHERE id = ?', [request.patientId]);
+    const appointment = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [request.appointmentId]);
+    if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
 
     if (status === 'Approved') {
-      // Update appointment
+      if (!request.requestedDate || !request.requestedTime) {
+        return res.status(400).json({ error: 'Request has no requested date/time to approve' });
+      }
+
+      // Re-check slot availability to prevent double booking
+      const conflictingAppt = await dbHelpers.get(
+        "SELECT id FROM appointments WHERE doctorId = ? AND date = ? AND time = ? AND status != 'Cancelled' AND id != ?",
+        [appointment.doctorId, request.requestedDate, request.requestedTime, request.appointmentId]
+      );
+      if (conflictingAppt) {
+        return res.status(409).json({
+          error: 'Slot no longer available',
+          message: 'The requested time slot has been booked by another appointment. Please suggest an alternative time.'
+        });
+      }
+
+      // Update the appointment with the new date and time
       await dbHelpers.run(
         'UPDATE appointments SET date = ?, time = ? WHERE id = ?',
         [request.requestedDate, request.requestedTime, request.appointmentId]
       );
 
-      const appt = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [request.appointmentId]);
-      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [request.patientId]);
+      // Update the request status and staff message
+      const message = staffMessage ||
+        `Your rescheduling request has been approved. Your new appointment is scheduled for ${request.requestedDate} at ${request.requestedTime}.`;
+      await dbHelpers.run(
+        'UPDATE reschedule_requests SET status = ?, staffMessage = ? WHERE id = ?',
+        ['Approved', message, req.params.id]
+      );
 
-      // Sync to Firestore
+      // Sync updated appointment to Firestore
       if (patient && patient.firebaseUid) {
         const apptDateTime = new Date(`${request.requestedDate}T${request.requestedTime}`).getTime();
         await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
           dateTime: apptDateTime,
-          rescheduleStatus: 'approved'
+          rescheduleStatus: 'approved',
+          staffMessage: message,
+          rescheduleNote: null,
+          rescheduleRequestedDate: null,
+          rescheduleRequestedTime: null,
         });
       }
+      console.log(`[Reschedule] Approved request ${req.params.id} — appointment ${request.appointmentId} moved to ${request.requestedDate} ${request.requestedTime}`);
+
     } else if (status === 'Rejected') {
-      const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [request.patientId]);
+      const message = staffMessage
+        ? `Your rescheduling request could not be approved because ${staffMessage}.`
+        : 'Your rescheduling request has been rejected.';
+      await dbHelpers.run(
+        'UPDATE reschedule_requests SET status = ?, staffMessage = ? WHERE id = ?',
+        ['Rejected', message, req.params.id]
+      );
+
+      // Sync rejection to Firestore
       if (patient && patient.firebaseUid) {
         await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
-          rescheduleStatus: 'rejected'
+          rescheduleStatus: 'rejected',
+          staffMessage: message,
+          rescheduleNote: null,
+          rescheduleRequestedDate: null,
+          rescheduleRequestedTime: null,
         });
       }
+      console.log(`[Reschedule] Rejected request ${req.params.id}`);
+
+    } else if (status === 'AlternativeSuggested') {
+      if (!suggestedDate || !suggestedTime) {
+        return res.status(400).json({ error: 'suggestedDate and suggestedTime required for AlternativeSuggested' });
+      }
+
+      // Verify the suggested slot is actually available
+      const conflictingAppt = await dbHelpers.get(
+        "SELECT id FROM appointments WHERE doctorId = ? AND date = ? AND time = ? AND status != 'Cancelled' AND id != ?",
+        [appointment.doctorId, suggestedDate, suggestedTime, request.appointmentId]
+      );
+      if (conflictingAppt) {
+        return res.status(409).json({
+          error: 'Suggested slot is not available',
+          message: 'The slot you are trying to suggest is already booked.'
+        });
+      }
+
+      const message = staffMessage ||
+        `The doctor is not available at your requested time. The doctor is available on ${suggestedDate} at ${suggestedTime}.`;
+      await dbHelpers.run(
+        'UPDATE reschedule_requests SET status = ?, staffMessage = ?, suggestedDate = ?, suggestedTime = ? WHERE id = ?',
+        ['AlternativeSuggested', message, suggestedDate, suggestedTime, req.params.id]
+      );
+
+      // Sync alternative suggestion to Firestore
+      if (patient && patient.firebaseUid) {
+        await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
+          rescheduleStatus: 'alternativeSuggested',
+          staffMessage: message,
+          suggestedDate: suggestedDate,
+          suggestedTime: suggestedTime,
+        });
+      }
+      console.log(`[Reschedule] Alternative suggested for request ${req.params.id} — ${suggestedDate} ${suggestedTime}`);
     }
 
     res.json({ success: true, status });
   } catch (err) {
+    console.error('[Reschedule PUT] Error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 app.delete('/api/appointments/:id', async (req, res) => {
   try {
@@ -1671,7 +1904,8 @@ app.post('/api/sync/patient/:id', async (req, res) => {
         status: appt.status === 'Confirmed' ? 'upcoming'
           : appt.status === 'Completed' ? 'completed'
             : appt.status === 'Cancelled' ? 'missed'
-              : 'upcoming',
+              : appt.status === 'Missed' ? 'missed'
+                : 'upcoming',
         rescheduleStatus: 'none',
         investigations: investigations,
         investigationNotes: appt.investigationNotes || null,
@@ -1683,6 +1917,7 @@ app.post('/api/sync/patient/:id', async (req, res) => {
     for (const log of logs) {
       const drugs = log.drugs ? JSON.parse(log.drugs) : [];
       for (const drug of drugs) {
+        if (!drug.drug) continue; // skip empty/placeholder drug rows
         const medId = `${log.id}_${drug.drug.replace(/\s+/g, '_')}`;
         const scheduledTimes = buildScheduledTimes(drug.frequency || 'Once daily');
         await syncMedicationToFirestore(patient.firebaseUid, medId, {
@@ -1693,7 +1928,7 @@ app.post('/api/sync/patient/:id', async (req, res) => {
           instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
           prescribedBy: log.doctorName,
           startDate: new Date(log.date).getTime(),
-          endDate: null,
+          endDate: drug.endDate ? new Date(drug.endDate).getTime() : null,
           takenStatus: {},
         });
       }
@@ -1744,7 +1979,9 @@ app.post('/api/sync/all', async (req, res) => {
             requestDetails: appt.details || '',
             status: appt.status === 'Confirmed' ? 'upcoming'
               : appt.status === 'Completed' ? 'completed'
-                : 'upcoming',
+                : appt.status === 'Cancelled' ? 'missed'
+                  : appt.status === 'Missed' ? 'missed'
+                    : 'upcoming',
             rescheduleStatus: 'none',
             investigations: appt.investigations ? JSON.parse(appt.investigations) : [],
             investigationNotes: appt.investigationNotes || null,
