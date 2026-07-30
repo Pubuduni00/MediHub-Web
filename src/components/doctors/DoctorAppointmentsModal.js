@@ -70,7 +70,7 @@ export default function DoctorAppointmentsModal({ isOpen, onClose, doctor }) {
                   <td>
                     <Badge 
                       label={appt.status} 
-                      variant={appt.status === 'Confirmed' ? 'success' : appt.status === 'Pending' ? 'warning' : 'danger'} 
+                      variant={appt.status === 'Completed' ? 'success' : appt.status === 'Pending' ? 'warning' : 'danger'} 
                     />
                   </td>
                 </tr>

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../common/Modal';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Edit2, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 const TYPES = ['Consultation','Follow-up','Review','Emergency','Procedure','Lab Visit'];
 
@@ -12,6 +13,50 @@ export default function EditAppointmentModal({ appointment, onClose }) {
   const [form, setForm] = useState({ ...appointment });
   const [saved, setSaved] = useState(false);
   const [deleted, setDeleted] = useState(false);
+
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  useEffect(() => {
+    if (form.doctorId && form.date) {
+      fetchSlots(form.doctorId, form.date);
+    } else {
+      setAvailableSlots([]);
+    }
+  }, [form.doctorId, form.date]);
+
+  const fetchSlots = async (docId, dateStr) => {
+    try {
+      setLoadingSlots(true);
+      const res = await fetch(`http://localhost:5000/api/doctors/${docId}/availability?date=${dateStr}`);
+      const data = await res.json();
+      
+      // Filter out slots that are booked, EXCEPT the currently booked slot of this appointment (if the date is the same)
+      let slots = data.filter(s => !s.isBooked || (dateStr === appointment.date && s.time === appointment.time));
+      
+      // Filter out past slots if the selected date is today, EXCEPT if the slot is the current slot time
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      if (dateStr === todayStr) {
+        const now = new Date();
+        const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        slots = slots.filter(s => s.time > currentTimeStr || (dateStr === appointment.date && s.time === appointment.time));
+      }
+      
+      // Ensure the current slot itself is in the list, even if it is not in the database availability slots at all!
+      if (dateStr === appointment.date && !slots.some(s => s.time === appointment.time)) {
+        slots.push({ id: 'current', time: appointment.time, isBooked: true });
+      }
+      
+      // Sort slots chronologically
+      slots.sort((a, b) => a.time.localeCompare(b.time));
+      
+      setAvailableSlots(slots);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
 
@@ -95,9 +140,13 @@ export default function EditAppointmentModal({ appointment, onClose }) {
               <label className="form-label">Date</label>
               <input type="date" className="form-control" value={form.date} onChange={e=>set('date',e.target.value)}/>
             </div>
-            <div className="form-group">
-              <label className="form-label">Time</label>
-              <input type="time" className="form-control" value={form.time} onChange={e=>set('time',e.target.value)}/>
+             <div className="form-group">
+              <label className="form-label">Time {loadingSlots && <span style={{fontSize:11}}>(Loading...)</span>}</label>
+              <select className="form-control" value={form.time} onChange={e=>set('time',e.target.value)} disabled={loadingSlots}>
+                <option value="">— Select slot —</option>
+                {availableSlots.map(s => <option key={s.id || s.time} value={s.time}>{s.time}</option>)}
+              </select>
+              {(!loadingSlots && availableSlots.length === 0) && <p style={{color:'var(--accent-red)',fontSize:11,marginTop:3}}>No free slots available</p>}
             </div>
           </div>
           <div className="grid-2">
@@ -110,7 +159,7 @@ export default function EditAppointmentModal({ appointment, onClose }) {
             <div className="form-group">
               <label className="form-label">Status</label>
               <select className="form-control" value={form.status} onChange={e=>set('status',e.target.value)}>
-                <option>Confirmed</option><option>Pending</option><option>Cancelled</option>
+                <option>Pending</option><option>Cancelled</option>
               </select>
             </div>
           </div>

@@ -67,7 +67,7 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
     try {
       const patient = patients.find(p=>p.id===form.patientId);
       const doctor = doctors.find(d=>d.id===form.doctorId) || { name: user?.name };
-      await addAppointment({ ...form, patientName: patient?.name||'', doctorName: doctor?.name||'', status:'Confirmed' });
+      await addAppointment({ ...form, patientName: patient?.name||'', doctorName: doctor?.name||'', status:'Pending' });
       setSaved(true);
     } catch (err) {
       console.error(err);

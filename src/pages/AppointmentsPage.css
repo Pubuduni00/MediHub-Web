@@ -8,7 +8,7 @@
 /* Stats Cards Grid */
 .appts-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-top: 4px;
 }
@@ -167,6 +167,8 @@
 .appt-time-block {
   display: flex;
   flex-direction: column;
+  width: 70px;
+  flex-shrink: 0;
 }
 
 .appt-time-value {
@@ -309,6 +311,8 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  width: 160px;
+  flex-shrink: 0;
 }
 
 .appt-btn {
@@ -421,7 +425,7 @@
     min-width: 110px;
   }
   .appt-actions-cell {
-    width: 130px;
+    width: 160px;
   }
 }
 

@@ -166,7 +166,7 @@ async function syncPatientByEmailIfFirebaseUserExists(email) {
           clinic: appt.details || appt.type || 'Clinic',
           doctorName: appt.doctorName,
           requestDetails: appt.details || '',
-          status: appt.status === 'Confirmed' ? 'upcoming'
+          status: (appt.status === 'Confirmed' || appt.status === 'Pending') ? 'upcoming'
             : appt.status === 'Completed' ? 'completed'
               : appt.status === 'Cancelled' ? 'missed'
                 : 'upcoming',
@@ -334,7 +334,7 @@ function initFirestoreListeners() {
                     clinic: appt.details || appt.type || 'Clinic',
                     doctorName: appt.doctorName,
                     requestDetails: appt.details || '',
-                    status: appt.status === 'Confirmed' ? 'upcoming'
+                    status: (appt.status === 'Confirmed' || appt.status === 'Pending') ? 'upcoming'
                       : appt.status === 'Completed' ? 'completed'
                         : appt.status === 'Cancelled' ? 'missed'
                           : 'upcoming',
@@ -1308,7 +1308,7 @@ app.put('/api/appointments/:id', async (req, res) => {
       const apptDateTime = new Date(`${updateDate}T${updateTime}`).getTime();
       await syncAppointmentToFirestore(patient.firebaseUid, req.params.id, {
         dateTime: apptDateTime,
-        status: (updated.status || '').toLowerCase() === 'confirmed' ? 'upcoming'
+        status: ((updated.status || '').toLowerCase() === 'confirmed' || (updated.status || '').toLowerCase() === 'pending') ? 'upcoming'
           : (updated.status || '').toLowerCase() === 'completed' ? 'completed'
             : (updated.status || '').toLowerCase() === 'cancelled' ? 'missed'
               : (updated.status || '').toLowerCase() === 'missed' ? 'missed'
@@ -1686,7 +1686,7 @@ app.post('/api/patient-logs', async (req, res) => {
             clinic: nextAppt.details || nextAppt.type || 'Clinic',
             doctorName: nextAppt.doctorName,
             requestDetails: nextAppt.details || '',
-            status: nextAppt.status === 'Confirmed' ? 'upcoming'
+            status: (nextAppt.status === 'Confirmed' || nextAppt.status === 'Pending') ? 'upcoming'
               : nextAppt.status === 'Completed' ? 'completed'
                 : nextAppt.status === 'Cancelled' ? 'missed'
                   : nextAppt.status === 'Missed' ? 'missed'
@@ -1901,7 +1901,7 @@ app.post('/api/sync/patient/:id', async (req, res) => {
         clinic: appt.details || appt.type || 'Clinic',
         doctorName: appt.doctorName,
         requestDetails: appt.details || '',
-        status: appt.status === 'Confirmed' ? 'upcoming'
+        status: (appt.status === 'Confirmed' || appt.status === 'Pending') ? 'upcoming'
           : appt.status === 'Completed' ? 'completed'
             : appt.status === 'Cancelled' ? 'missed'
               : appt.status === 'Missed' ? 'missed'
@@ -1977,7 +1977,7 @@ app.post('/api/sync/all', async (req, res) => {
             clinic: appt.details || appt.type || 'Clinic',
             doctorName: appt.doctorName,
             requestDetails: appt.details || '',
-            status: appt.status === 'Confirmed' ? 'upcoming'
+            status: (appt.status === 'Confirmed' || appt.status === 'Pending') ? 'upcoming'
               : appt.status === 'Completed' ? 'completed'
                 : appt.status === 'Cancelled' ? 'missed'
                   : appt.status === 'Missed' ? 'missed'

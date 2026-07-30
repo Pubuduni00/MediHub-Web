@@ -25,8 +25,10 @@ export function exportAppointmentsPDF(appointments, dateStr) {
       doc.setTextColor(26, 43, 60);
       doc.setFontSize(10); doc.setFont('helvetica', 'normal');
       doc.text(`Total Appointments: ${sorted.length}`, margin, 42);
-      const confirmed = sorted.filter(a => a.status === 'Confirmed').length;
-      doc.text(`Confirmed: ${confirmed}  |  Pending: ${sorted.length - confirmed}`, margin, 49);
+      const pending = sorted.filter(a => a.status === 'Pending').length;
+      const completed = sorted.filter(a => a.status === 'Completed').length;
+      const missed = sorted.filter(a => a.status === 'Missed').length;
+      doc.text(`Pending: ${pending}  |  Completed: ${completed}  |  Missed: ${missed}`, margin, 49);
 
       // Table
       autoTable(doc, {

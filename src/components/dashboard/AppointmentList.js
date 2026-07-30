@@ -54,7 +54,7 @@ export default function AppointmentList() {
                 <div style={{display:'flex',alignItems:'center',gap:4,color:'var(--primary)',fontSize:12.5,fontWeight:600}}>
                   <Clock size={12}/>{appt.time}
                 </div>
-                <Badge label={appt.status} variant={appt.status==='Confirmed'?'success':'warning'}/>
+                <Badge label={appt.status} variant={appt.status==='Completed'?'success':appt.status==='Pending'?'warning':'danger'}/>
               </div>
             </div>
           ))}

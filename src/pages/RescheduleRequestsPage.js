@@ -141,10 +141,14 @@ function SuggestModal({ request, onConfirm, onClose, loading }) {
         // The current appointment slot is excluded (staff can't suggest same slot)
         const currentKey = `${request.oldDate}_${request.oldTime}`;
 
+        const now = new Date();
+        const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         const free = data
-          .filter(s => s.date >= todayStr
-            && !s.isBooked
-            && `${s.date}_${s.time}` !== currentKey)
+          .filter(s => {
+            if (s.date < todayStr) return false;
+            if (s.date === todayStr && s.time <= currentTimeStr) return false;
+            return !s.isBooked && `${s.date}_${s.time}` !== currentKey;
+          })
           .map(s => ({ date: s.date, time: s.time }));
 
         setSlots(free);
