@@ -98,7 +98,7 @@ export default function AppointmentCalendar({ onAddAppointment }) {
                   <div key={a.id} style={{
                     fontSize:10, padding:'1px 5px',
                     borderRadius:4,
-                    background: a.status==='Confirmed' ? 'var(--accent-green)' : 'var(--accent-orange)',
+                    background: a.status==='Completed' ? 'var(--accent-green)' : a.status==='Pending' ? 'var(--accent-orange)' : 'var(--accent-red)',
                     color:'#fff', fontWeight:600,
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
                   }}>

@@ -61,7 +61,6 @@ export default function AppointmentsPage() {
 
   const stats = {
     total: todayAllAppts.length,
-    confirmed: todayAllAppts.filter(a => a.status === 'Confirmed').length,
     pending: todayAllAppts.filter(a => a.status === 'Pending').length,
     completed: todayAllAppts.filter(a => a.status === 'Completed').length,
   };
@@ -125,15 +124,7 @@ export default function AppointmentsPage() {
             <span className="appt-stat-value">{stats.total}</span>
           </div>
         </div>
-        <div className="appt-stat-card">
-          <div className="appt-stat-icon confirmed">
-            <Check size={18} />
-          </div>
-          <div className="appt-stat-info">
-            <span className="appt-stat-label">Confirmed</span>
-            <span className="appt-stat-value">{stats.confirmed}</span>
-          </div>
-        </div>
+
         <div className="appt-stat-card">
           <div className="appt-stat-icon pending">
             <Clock size={18} />
@@ -171,7 +162,7 @@ export default function AppointmentsPage() {
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."/>
               </div>
               <div className="appts-filter-tabs">
-                {['All','Confirmed','Pending','Completed','Missed'].map(f=>(
+                {['All','Pending','Completed','Missed'].map(f=>(
                   <button key={f} onClick={()=>setFilterStatus(f)}
                     className={`appts-filter-btn ${filterStatus===f ? 'active' : ''}`}>
                     {f}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Check, Plus, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 
 const parseLocalDate = (dateStr) => {
   if (!dateStr) return new Date();
@@ -11,26 +11,115 @@ const parseLocalDate = (dateStr) => {
 const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [saving, setSaving] = useState(false);
-  const [ranges, setRanges] = useState([{ start: '08:00', end: '12:00' }]);
 
-  // Generate 15 min intervals for dropdowns
+  // Check if a time slot is in the past (only when today is selected)
+  const isPastTimeSlot = (timeStr) => {
+    if (!isToday(selectedDate)) return false;
+    const now = new Date();
+    const [slotH, slotM] = timeStr.split(':').map(Number);
+    const currentH = now.getHours();
+    const currentM = now.getMinutes();
+    if (slotH < currentH) return true;
+    if (slotH === currentH && slotM < currentM) return true;
+    return false;
+  };
+
+  const getInitialRanges = () => {
+    const now = new Date();
+    const currentH = now.getHours();
+    const currentM = now.getMinutes();
+    
+    // Find next 15-minute slot from now
+    let startHour = currentH;
+    let startMin = Math.ceil(currentM / 15) * 15;
+    if (startMin >= 60) {
+      startHour += 1;
+      startMin = 0;
+    }
+    
+    if (startHour >= 24) {
+      // Very late at night (after 23:45)
+      return [{ start: '23:45', end: '23:59' }];
+    }
+    
+    const startStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+    
+    let endHour = startHour + 1;
+    let endMin = startMin;
+    if (endHour >= 24) {
+      endHour = 23;
+      endMin = 59;
+    }
+    const endStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+    
+    return [{ start: startStr, end: endStr }];
+  };
+
+  const [ranges, setRanges] = useState(getInitialRanges());
+
+  // Generate 15 min intervals for dropdowns covering 24h
   const generateDropdownTimes = () => {
     const times = [];
-    for (let h = 8; h <= 18; h++) {
+    for (let h = 0; h < 24; h++) {
       for (let m = 0; m < 60; m += 15) {
-        if (h === 18 && m > 0) continue; // Ends at 18:00
         const hh = h.toString().padStart(2, '0');
         const mm = m.toString().padStart(2, '0');
         times.push(`${hh}:${mm}`);
       }
     }
+    times.push('23:59'); // Include end of the 24-hour day
     return times;
   };
 
   const allTimeSlots = generateDropdownTimes();
 
   const handleAddRange = () => {
-    setRanges([...ranges, { start: '13:00', end: '17:00' }]);
+    let startStr = '13:00';
+    let endStr = '17:00';
+    
+    if (ranges.length > 0) {
+      const lastRange = ranges[ranges.length - 1];
+      startStr = lastRange.end;
+      const [h, m] = startStr.split(':').map(Number);
+      let endH = h + 1;
+      let endM = m;
+      if (endH >= 24) {
+        endH = 23;
+        endM = 59;
+      }
+      endStr = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+    }
+    
+    // If today is selected, ensure it is in the future
+    if (isToday(selectedDate)) {
+      const now = new Date();
+      const currentH = now.getHours();
+      const currentM = now.getMinutes();
+      const [sh, sm] = startStr.split(':').map(Number);
+      if (sh < currentH || (sh === currentH && sm < currentM)) {
+        let startHour = currentH;
+        let startMin = Math.ceil(currentM / 15) * 15;
+        if (startMin >= 60) {
+          startHour += 1;
+          startMin = 0;
+        }
+        if (startHour >= 24) {
+          startHour = 23;
+          startMin = 45;
+        }
+        startStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
+        
+        let endHour = startHour + 1;
+        let endMin = startMin;
+        if (endHour >= 24) {
+          endHour = 23;
+          endMin = 59;
+        }
+        endStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    setRanges([...ranges, { start: startStr, end: endStr }]);
   };
 
   const handleRemoveRange = (index) => {
@@ -40,6 +129,22 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   const handleRangeChange = (index, field, value) => {
     const newRanges = [...ranges];
     newRanges[index][field] = value;
+    
+    // If we changed the start time and it is now >= the end time, let's adjust the end time
+    if (field === 'start') {
+      const startIndex = allTimeSlots.indexOf(value);
+      const endIndex = allTimeSlots.indexOf(newRanges[index].end);
+      if (startIndex >= endIndex) {
+        // Set end time to next slot after start time, or 23:59
+        if (startIndex + 4 < allTimeSlots.length) {
+          // Default to start + 1 hour (4 slots of 15 min)
+          newRanges[index].end = allTimeSlots[startIndex + 4];
+        } else {
+          newRanges[index].end = allTimeSlots[allTimeSlots.length - 1]; // 23:59
+        }
+      }
+    }
+    
     setRanges(newRanges);
   };
 
@@ -62,8 +167,14 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
 
         // Generate the 15-min slots for the backend automatically
         for (let i = startIndex; i < endIndex; i++) {
-          if (!slotTimes.includes(allTimeSlots[i])) {
-            slotTimes.push(allTimeSlots[i]);
+          const slotTime = allTimeSlots[i];
+          if (isToday(selectedDate) && isPastTimeSlot(slotTime)) {
+            alert(`Time slot ${slotTime} is in the past and cannot be selected.`);
+            setSaving(false);
+            return;
+          }
+          if (!slotTimes.includes(slotTime)) {
+            slotTimes.push(slotTime);
           }
         }
       }
@@ -150,7 +261,11 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
                   onChange={e => handleRangeChange(index, 'start', e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none', fontSize: '15px' }}
                 >
-                  {allTimeSlots.map(t => <option key={`start-${t}`} value={t}>{t}</option>)}
+                  {allTimeSlots.filter(t => t !== '23:59').map(t => (
+                    <option key={`start-${t}`} value={t} disabled={isPastTimeSlot(t)}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 500 }}>to</div>
@@ -160,7 +275,11 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
                   onChange={e => handleRangeChange(index, 'end', e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', outline: 'none', fontSize: '15px' }}
                 >
-                  {allTimeSlots.map(t => <option key={`end-${t}`} value={t}>{t}</option>)}
+                  {allTimeSlots.map(t => (
+                    <option key={`end-${t}`} value={t} disabled={isPastTimeSlot(t) || allTimeSlots.indexOf(t) <= allTimeSlots.indexOf(range.start)}>
+                      {t}
+                    </option>
+                  ))}
                 </select>
               </div>
               

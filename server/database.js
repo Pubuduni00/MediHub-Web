@@ -345,11 +345,11 @@ async function initDatabase() {
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
       const dayAfter = new Date(Date.now() + 172800000).toISOString().split('T')[0];
       const appointments = [
-        ['AP001', 'PT001', 'Rohan Fernando', 'DR001', 'Dr. Amara Patel', today, '09:00', 'Follow-up', 'Confirmed', 'Routine cardiac checkup', 30, JSON.stringify(['FBC', 'ECG Report', 'Blood Pressure Log']), 'Please bring all original reports. Fasting required.'],
-        ['AP002', 'PT002', 'Kamala Perera', 'DR002', 'Dr. James Wilson', today, '10:30', 'Consultation', 'Confirmed', 'First visit - general checkup', 45, JSON.stringify([]), null],
+        ['AP001', 'PT001', 'Rohan Fernando', 'DR001', 'Dr. Amara Patel', today, '09:00', 'Follow-up', 'Pending', 'Routine cardiac checkup', 30, JSON.stringify(['FBC', 'ECG Report', 'Blood Pressure Log']), 'Please bring all original reports. Fasting required.'],
+        ['AP002', 'PT002', 'Kamala Perera', 'DR002', 'Dr. James Wilson', today, '10:30', 'Consultation', 'Pending', 'First visit - general checkup', 45, JSON.stringify([]), null],
         ['AP003', 'PT003', 'Arun Wickramasinghe', 'DR001', 'Dr. Amara Patel', today, '11:00', 'Review', 'Pending', 'ECG review', 30, JSON.stringify(['ECG Report', 'Chest X-Ray']), 'Wear comfortable clothing for ECG.'],
-        ['AP004', 'PT004', 'Sandya Jayawardena', 'DR002', 'Dr. James Wilson', tomorrow, '14:00', 'Follow-up', 'Confirmed', 'Blood test results', 20, JSON.stringify([]), null],
-        ['AP005', 'PT005', 'Malik Bandara', 'DR003', 'Dr. Priya Nair', dayAfter, '09:30', 'Consultation', 'Confirmed', 'Neurological assessment', 60, JSON.stringify(['MRI Brain Report', 'Previous neurology notes']), 'Bring any previous scan reports.']
+        ['AP004', 'PT004', 'Sandya Jayawardena', 'DR002', 'Dr. James Wilson', tomorrow, '14:00', 'Follow-up', 'Pending', 'Blood test results', 20, JSON.stringify([]), null],
+        ['AP005', 'PT005', 'Malik Bandara', 'DR003', 'Dr. Priya Nair', dayAfter, '09:30', 'Consultation', 'Pending', 'Neurological assessment', 60, JSON.stringify(['MRI Brain Report', 'Previous neurology notes']), 'Bring any previous scan reports.']
       ];
       for (const ap of appointments) {
         await dbHelpers.run(
