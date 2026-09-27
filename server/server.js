@@ -454,6 +454,25 @@ function initFirestoreListeners() {
                   [appointment.patientId]
                 );
                 if (!patient) continue;
+
+                // Validation: Reschedule requests are only allowed up to the day before the appointment
+                const apptDate = new Date(appointment.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                apptDate.setHours(0, 0, 0, 0);
+                
+                if (apptDate <= today) {
+                  // Revert the Firestore status and notify the user
+                  await db_firebase.collection('users').doc(patient.firebaseUid)
+                    .collection('appointments').doc(apptId)
+                    .update({
+                      rescheduleStatus: 'rejected',
+                      staffMessage: 'Cannot reschedule on or after the day of the appointment.'
+                    });
+                  console.log(`[Listener] Reschedule request for ${apptId} blocked: same-day or past appointment.`);
+                  continue;
+                }
+
                 const requestId = await generateNextId('reschedule_requests', 'RR');
                 // Store reason and requested slot if provided via Firestore
                 const reason = apptData.rescheduleNote || null;
@@ -890,23 +909,14 @@ app.get('/api/mobile/available-slots', async (req, res) => {
     if (!targetDoctorId && doctorName) {
       const cleanName = doctorName.replace(/^Dr\.\s*/i, '').trim();
       const doc = await dbHelpers.get(
-        'SELECT id FROM doctors WHERE name = ? OR name = ? OR name LIKE ? OR name LIKE ?',
-        [doctorName, `Dr. ${cleanName}`, `%${cleanName}%`, `%${doctorName}%`]
+        'SELECT id FROM doctors WHERE name ILIKE ? OR name ILIKE ?',
+        [doctorName, `%${cleanName}%`]
       );
       if (doc) {
         targetDoctorId = doc.id;
         console.log(`[Available Slots Route] Resolved targetDoctorId=${targetDoctorId} from doctorName="${doctorName}"`);
       } else {
         console.log(`[Available Slots Route] Doctor name "${doctorName}" not found in DB`);
-      }
-    }
-
-    // 3. If targetDoctorId is STILL not found, search for any doctor with availability in DB
-    if (!targetDoctorId) {
-      const availDoc = await dbHelpers.get('SELECT DISTINCT doctorId FROM doctor_availability LIMIT 1');
-      if (availDoc) {
-        targetDoctorId = availDoc.doctorId;
-        console.log(`[Available Slots Route] Resolved targetDoctorId=${targetDoctorId} (fallback to any doctor with availability)`);
       }
     }
 
@@ -926,14 +936,7 @@ app.get('/api/mobile/available-slots', async (req, res) => {
       console.log(`[Available Slots Route] Slots with date >= ${todayStr}: ${slots.length}`);
     }
 
-    // 5. If 0 slots for this doctor, fallback to ANY available slots across all doctors (future only)
-    if (slots.length === 0) {
-      slots = await dbHelpers.all(
-        'SELECT * FROM doctor_availability WHERE date >= ? ORDER BY date ASC, time ASC',
-        [todayStr]
-      );
-      console.log(`[Available Slots Route] Fallback slots across all doctors: ${slots.length}`);
-    }
+    // 5. Removed fallback to other doctors to prevent incorrect bookings
 
     // 6. Filter out booked slots, current appointment slot, and past times on today
     const appts = targetDoctorId
