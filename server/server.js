@@ -823,6 +823,79 @@ app.post('/api/mobile/checkin', async (req, res) => {
 });
 
 // â”€â”€ NEW: Receive Reschedule Request from Mobile App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+app.post('/api/mobile/reschedule-reply', async (req, res) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey !== process.env.CLOUD_FUNCTION_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { firebase_uid, appointment_id, action } = req.body;
+    if (!firebase_uid || !appointment_id || !action) {
+      return res.status(400).json({ error: 'firebase_uid, appointment_id, action required' });
+    }
+
+    const patient = await dbHelpers.get(
+      'SELECT * FROM patients WHERE firebase_uid = ?', [firebase_uid]
+    );
+    if (!patient) return res.status(404).json({ error: 'Patient not found' });
+
+    const request = await dbHelpers.get(
+      'SELECT * FROM reschedule_requests WHERE appointmentId = ? AND status = ?',
+      [appointment_id, 'AlternativeSuggested']
+    );
+
+    if (action === 'accept') {
+      if (request) {
+        await dbHelpers.run(
+          'UPDATE appointments SET date = ?, time = ? WHERE id = ?',
+          [request.suggestedDate, request.suggestedTime, appointment_id]
+        );
+        await dbHelpers.run(
+          'UPDATE reschedule_requests SET status = ? WHERE id = ?',
+          ['Approved', request.id]
+        );
+
+        const newDateStr = `${request.suggestedDate}T${request.suggestedTime}:00`;
+        const newDateTime = new Date(newDateStr).getTime();
+
+        await syncAppointmentToFirestore(firebase_uid, appointment_id, {
+          rescheduleStatus: 'accepted',
+          staffMessage: 'You accepted the alternative time.',
+          dateTime: newDateTime,
+        });
+      } else {
+        // Fallback if request not found in postgres
+        await syncAppointmentToFirestore(firebase_uid, appointment_id, {
+          rescheduleStatus: 'accepted',
+          staffMessage: 'You accepted the alternative time.',
+        });
+      }
+    } else if (action === 'reject') {
+      if (request) {
+        await dbHelpers.run(
+          'UPDATE reschedule_requests SET status = ? WHERE id = ?',
+          ['Rejected', request.id]
+        );
+      }
+      await syncAppointmentToFirestore(firebase_uid, appointment_id, {
+        rescheduleStatus: 'none',
+        staffMessage: null,
+        suggestedDate: null,
+        suggestedTime: null,
+        rescheduleRequestedDate: null,
+        rescheduleRequestedTime: null,
+        rescheduleNote: null
+      });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Reschedule reply error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.post('/api/mobile/reschedule-request', async (req, res) => {
   try {
     const apiKey = req.headers['x-api-key'];
