@@ -380,7 +380,7 @@ function initFirestoreListeners() {
   db_firebase.collectionGroup('checkIns').onSnapshot(async (snapshot) => {
     try {
       for (const change of snapshot.docChanges()) {
-        if (change.type === 'added' || change.type === 'modified') {
+        if (change.type === 'added') {
           const checkInData = change.doc.data();
           const userDocRef = change.doc.ref.parent.parent;
           if (!userDocRef) continue;
@@ -392,46 +392,33 @@ function initFirestoreListeners() {
             );
             if (!patient) continue;
             const dateStr = checkInData.date ? new Date(checkInData.date).toISOString() : new Date().toISOString();
-            
             const existingLog = await dbHelpers.get(
               'SELECT * FROM symptom_logs WHERE patientid = ? AND date = ?',
               [patient.id, dateStr]
             );
-
-            const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
-            const healthStatus = checkInData.healthStatus || 'stable';
-            const severity = healthStatus === 'critical' ? 'Severe'
-              : healthStatus === 'warning' ? 'Moderate' : 'Mild';
-
-            if (existingLog) {
-              await dbHelpers.run(
-                'UPDATE symptom_logs SET symptoms = ?, severity = ?, notes = ? WHERE id = ?',
-                [JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', existingLog.id]
-              );
-              await dbHelpers.run(
-                "DELETE FROM alerts WHERE patientId = ? AND date = ? AND type = 'Symptom'",
-                [patient.id, dateStr]
-              );
-            } else {
+            if (!existingLog) {
               const id = await generateNextId('symptom_logs', 'SL');
+              const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
+              const healthStatus = checkInData.healthStatus || 'stable';
+              const severity = healthStatus === 'critical' ? 'Severe'
+                : healthStatus === 'warning' ? 'Moderate' : 'Mild';
               await dbHelpers.run(
                 'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', 'MediHub App']
               );
-            }
-
-            if (healthStatus === 'critical') {
-              const alertId = await generateNextId('alerts', 'AL');
-              await dbHelpers.run(
-                'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
-              );
-            } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
-              const alertId = await generateNextId('alerts', 'AL');
-              await dbHelpers.run(
-                'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
-              );
+              if (healthStatus === 'critical') {
+                const alertId = await generateNextId('alerts', 'AL');
+                await dbHelpers.run(
+                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                  [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
+                );
+              } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
+                const alertId = await generateNextId('alerts', 'AL');
+                await dbHelpers.run(
+                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+                  [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
+                );
+              }
             }
           } catch (err) {
             console.error('[Listener] Check-in error:', err.message);
@@ -800,39 +787,19 @@ app.post('/api/mobile/checkin', async (req, res) => {
     );
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
+    // Save to symptom_logs table
+    const id = await generateNextId('symptom_logs', 'SL');
     const dateStr = date ? new Date(date).toISOString() : new Date().toISOString();
     const symptomsArray = Array.isArray(symptoms) ? symptoms : [];
     const severity = health_status === 'critical' ? 'Severe'
       : health_status === 'warning' ? 'Moderate' : 'Mild';
 
-    // Check if existing check-in
-    const existingLog = await dbHelpers.get(
-      'SELECT * FROM symptom_logs WHERE patientId = ? AND date = ?',
-      [patient.id, dateStr]
+    await dbHelpers.run(
+      'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, notes || '', 'MediHub App']
     );
 
-    let id = existingLog ? existingLog.id : await generateNextId('symptom_logs', 'SL');
-
-    if (existingLog) {
-      // Update existing
-      await dbHelpers.run(
-        'UPDATE symptom_logs SET symptoms = ?, severity = ?, notes = ? WHERE id = ?',
-        [JSON.stringify(symptomsArray), severity, notes || '', id]
-      );
-      // Remove the old alert to prevent duplicates
-      await dbHelpers.run(
-        "DELETE FROM alerts WHERE patientId = ? AND date = ? AND type = 'Symptom'",
-        [patient.id, dateStr]
-      );
-    } else {
-      // Insert new
-      await dbHelpers.run(
-        'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, notes || '', 'MediHub App']
-      );
-    }
-
-    // Auto-create alert if critical or warning
+    // Auto-create alert if critical
     if (health_status === 'critical') {
       const alertId = await generateNextId('alerts', 'AL');
       await dbHelpers.run(
