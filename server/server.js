@@ -461,15 +461,33 @@ function initFirestoreListeners() {
                 today.setHours(0, 0, 0, 0);
                 apptDate.setHours(0, 0, 0, 0);
                 
-                if (apptDate <= today) {
+                const diffTime = today - apptDate;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                let isBlocked = false;
+                let blockReason = '';
+                
+                if (appointment.status === 'Missed') {
+                  if (diffDays > 3) {
+                    isBlocked = true;
+                    blockReason = 'Cannot reschedule a missed appointment after 3 days.';
+                  }
+                } else {
+                  if (apptDate <= today) {
+                    isBlocked = true;
+                    blockReason = 'Cannot reschedule on or after the day of the appointment.';
+                  }
+                }
+
+                if (isBlocked) {
                   // Revert the Firestore status and notify the user
                   await db_firebase.collection('users').doc(patient.firebaseUid)
                     .collection('appointments').doc(apptId)
                     .update({
                       rescheduleStatus: 'rejected',
-                      staffMessage: 'Cannot reschedule on or after the day of the appointment.'
+                      staffMessage: blockReason
                     });
-                  console.log(`[Listener] Reschedule request for ${apptId} blocked: same-day or past appointment.`);
+                  console.log(`[Listener] Reschedule request for ${apptId} blocked: ${blockReason}`);
                   continue;
                 }
 
@@ -831,8 +849,17 @@ app.post('/api/mobile/reschedule-request', async (req, res) => {
     today.setHours(0, 0, 0, 0);
     apptDate.setHours(0, 0, 0, 0);
 
-    if (apptDate <= today) {
-      return res.status(400).json({ error: 'Cannot reschedule on or after the day of the appointment' });
+    const diffTime = today - apptDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (appointment.status === 'Missed') {
+      if (diffDays > 3) {
+        return res.status(400).json({ error: 'Cannot reschedule a missed appointment after 3 days' });
+      }
+    } else {
+      if (apptDate <= today) {
+        return res.status(400).json({ error: 'Cannot reschedule on or after the day of the appointment' });
+      }
     }
 
     const requestId = await generateNextId('reschedule_requests', 'RR');
