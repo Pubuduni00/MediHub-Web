@@ -11,7 +11,7 @@ export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments
     const q = search.toLowerCase();
     const name = d.name ? d.name.toLowerCase() : '';
     const specialty = d.specialty ? d.specialty.toLowerCase() : '';
-    const employeeId = d.employeeId ? d.employeeId.toLowerCase() : '';
+    const employeeId = (d.employeeId || d.id || '').toLowerCase();
     return name.includes(q) || specialty.includes(q) || employeeId.includes(q);
   });
 
@@ -66,7 +66,7 @@ export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments
                       </div>
                     </div>
                   </td>
-                  <td><span style={{ fontFamily:'monospace', fontSize:12.5, background:'var(--bg-base)', padding:'2px 7px', borderRadius:4, color:'var(--primary)', fontWeight:600 }}>{d.employeeId}</span></td>
+                  <td><span style={{ fontFamily:'monospace', fontSize:12.5, background:'var(--bg-base)', padding:'2px 7px', borderRadius:4, color:'var(--primary)', fontWeight:600 }}>{d.employeeId || d.id}</span></td>
                   <td style={{ fontSize:13 }}>{d.specialty}</td>
                   <td style={{ fontSize:13 }}>{d.department}</td>
                   <td style={{ fontSize:13 }}>{d.phone}</td>
