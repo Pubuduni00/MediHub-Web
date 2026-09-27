@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../common/Modal';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -35,8 +35,15 @@ export default function MedicalHistoryModal({ isOpen, onClose, patientId, existi
   const { updatePatient, getPatientById } = useData();
   const { user } = useAuth();
   const patient = getPatientById(patientId);
-  const [form, setForm] = useState(existingHistory || { ...EMPTY });
+  const [form, setForm] = useState({ ...EMPTY });
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm(existingHistory || { ...EMPTY });
+      setSaved(false);
+    }
+  }, [isOpen, patientId, existingHistory]);
 
   const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const setNested = (parent, f, v) => setForm(p => ({ ...p, [parent]: { ...p[parent], [f]: v } }));

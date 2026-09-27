@@ -10,10 +10,10 @@ export default function EditPatientModal({ isOpen, onClose, patient }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (patient) {
+    if (isOpen && patient) {
       setForm({ ...patient });
     }
-  }, [patient]);
+  }, [isOpen, patient?.id]);
 
   const set = (field, value) => {
     setForm(f => ({ ...f, [field]: value }));

@@ -78,7 +78,7 @@ export default function LoginPage() {
               <div className="form-group">
                 <label className="form-label">Email Address</label>
                 <div style={{ position: 'relative' }}>
-                  <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@medihub.com" style={{ paddingLeft: 38 }} required />
+                  <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@gmail.com" style={{ paddingLeft: 38 }} required />
                   <Users size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
               </div>

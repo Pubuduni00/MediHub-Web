@@ -294,13 +294,26 @@ async function initDatabase() {
     const staffCountResult = await dbHelpers.get('SELECT COUNT(*) as count FROM staff');
     const count = parseInt(staffCountResult.count, 10);
 
+    const legacyStaffEmailUpdates = [
+      ['ST001', 'admin@medihub.com', 'admin@gmail.com'],
+      ['ST002', 'reception@medihub.com', 'reception@gmail.com'],
+      ['ST003', 'staff@medihub.com', 'staff@gmail.com']
+    ];
+
+    for (const [id, oldEmail, newEmail] of legacyStaffEmailUpdates) {
+      await dbHelpers.run(
+        'UPDATE staff SET email = ? WHERE id = ? AND LOWER(email) = ?',
+        [newEmail, id, oldEmail]
+      );
+    }
+
     if (count === 0) {
       console.log('Seeding initial data into PostgreSQL...');
 
       const staffMembers = [
-        ['ST001', 'admin@medihub.com', 'Staff@1234', 'Sarah Johnson', 'staff', 'Administration'],
-        ['ST002', 'reception@medihub.com', 'Staff@1234', 'Michael Chen', 'staff', 'Reception'],
-        ['ST003', 'staff@medihub.com', 'Staff@1234', 'Pubuduni Mayanthi', 'staff', 'General Medicine']
+        ['ST001', 'admin@gmail.com', 'Staff@1234', 'Sarah Johnson', 'staff', 'Administration'],
+        ['ST002', 'reception@gmail.com', 'Staff@1234', 'Michael Chen', 'staff', 'Reception'],
+        ['ST003', 'staff@gmail.com', 'Staff@1234', 'Pubuduni Mayanthi', 'staff', 'General Medicine']
       ];
       for (const s of staffMembers) {
         await dbHelpers.run(
