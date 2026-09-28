@@ -1370,8 +1370,8 @@ app.post('/api/appointments', async (req, res) => {
         requestDetails: details || '',
         status: 'upcoming',
         rescheduleStatus: 'none',
-        investigations: investigations || [],
-        investigationNotes: investigationNotes || null,
+        investigations: typeof finalInvs !== 'undefined' ? finalInvs : (investigations || []),
+          investigationNotes: typeof finalInvNotes !== 'undefined' ? finalInvNotes : (investigationNotes || null),
       });
     }
 
@@ -1605,7 +1605,9 @@ app.get('/api/patient-logs', async (req, res) => {
       ...l,
       examination: JSON.parse(l.examination),
       drugs: JSON.parse(l.drugs),
-      investigations: JSON.parse(l.investigations)
+      investigations: JSON.parse(l.investigations),
+        nextSessionInvestigations: l.nextsessioninvestigations ? JSON.parse(l.nextsessioninvestigations) : [],
+        nextSessionNotes: l.nextsessionnotes || null
     }));
     res.json(parsedLogs);
   } catch (err) {
@@ -1753,9 +1755,10 @@ app.post('/api/patient-logs', async (req, res) => {
     const drugsStr = JSON.stringify(allChanges);
 
     // Save Patient Log
+    const nextInvStr = nextSessionInvestigations ? JSON.stringify(nextSessionInvestigations) : null;
     await dbHelpers.run(
-      'INSERT INTO patient_logs (id, patientId, doctorId, doctorName, date, examination, drugs, investigations) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, patientId, doctorId, doctorName, date, examStr, drugsStr, invStr]
+      'INSERT INTO patient_logs (id, patientId, doctorId, doctorName, date, examination, drugs, investigations, nextSessionInvestigations, nextSessionNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, patientId, doctorId, doctorName, date, examStr, drugsStr, invStr, nextInvStr, nextSessionNotes || null]
     );
 
     // Automatically create Prescription record if there are changes
@@ -1781,6 +1784,7 @@ app.post('/api/patient-logs', async (req, res) => {
           "UPDATE appointments SET investigations = ?, investigationNotes = ? WHERE id = ?",
           [invsJson, nextSessionNotes || null, nextAppt.id]
         );
+        await dbHelpers.run("UPDATE patient_logs SET investigationsAttached = 1 WHERE id = ?", [id]);
         // Sync to Firestore
         if (patient && patient.firebaseUid) {
           const apptDateTime = new Date(`${nextAppt.date}T${nextAppt.time}`).getTime();
