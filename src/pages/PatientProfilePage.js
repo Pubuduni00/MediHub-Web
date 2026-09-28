@@ -328,23 +328,41 @@ export default function PatientProfilePage() {
               <p style={{ color:'var(--text-muted)', fontSize:13.5, padding:'12px 0' }}>No logs recorded yet.</p>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {logs.slice().reverse().slice(0,5).map(log=>(
-                  <div key={log.id} 
-                    className="clickable-log-item"
-                    onClick={() => {
-                      setSelectedLogDate(log.date);
-                      setSelectedLogsForPopup([log]);
-                    }}
-                    style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}
-                  >
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <span style={{ fontWeight:600, fontSize:13, color:'var(--text-primary)' }}>{log.date}</span>
-                      <span style={{ fontSize:12, color:'var(--text-muted)' }}>
-                        {log.drugs?.length||0} drug(s) · {log.investigations?.length||0} investigation(s)
-                      </span>
+                {(() => {
+                const groupedLogs = {};
+                logs.forEach(log => {
+                  if (!groupedLogs[log.date]) groupedLogs[log.date] = [];
+                  groupedLogs[log.date].push(log);
+                });
+                const sortedDates = Object.keys(groupedLogs).sort((a,b) => new Date(b) - new Date(a)).slice(0,5);
+                
+                return sortedDates.map(date => {
+                  const dateLogs = groupedLogs[date];
+                  let uniqueDrugs = new Set();
+                  let totalInvest = 0;
+                  dateLogs.forEach(l => {
+                    if (l.drugs) l.drugs.forEach(d => { if(d.drug) uniqueDrugs.add(d.drug.toLowerCase().trim()); });
+                    if (l.investigations) totalInvest += l.investigations.length;
+                  });
+                  return (
+                    <div key={date} 
+                      className="clickable-log-item"
+                      onClick={() => {
+                        setSelectedLogDate(date);
+                        setSelectedLogsForPopup(dateLogs);
+                      }}
+                      style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)', background:'var(--bg-base)' }}
+                    >
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ fontWeight:600, fontSize:13, color:'var(--text-primary)' }}>{date}</span>
+                        <span style={{ fontSize:12, color:'var(--text-muted)' }}>
+                          {uniqueDrugs.size} drug(s) - {totalInvest} investigation(s)
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                });
+              })()}
               </div>
             )}
           </div>
@@ -399,42 +417,53 @@ export default function PatientProfilePage() {
               </p>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {prescriptions.slice().reverse().map(rx=>(
-                  <div key={rx.id} style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-                      <span style={{ fontWeight:700, fontSize:12.5, color:'var(--primary)' }}>{rx.date}</span>
+                {(() => {
+                  const grouped = {};
+                  prescriptions.forEach(rx => {
+                    if (!grouped[rx.date]) grouped[rx.date] = [];
+                    if (rx.drugs && rx.drugs.length > 0) {
+                      grouped[rx.date].push(...rx.drugs);
+                    }
+                  });
+                  const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
+                  
+                  return sortedDates.map(date => (
+                    <div key={date} style={{ padding:'6px 10px', borderRadius:'var(--radius-md)', border:'1px solid var(--border)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                        <span style={{ fontWeight:700, fontSize:12.5, color:'var(--primary)' }}>{date}</span>
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {grouped[date].length > 0 ? (
+                          grouped[date].map((d,i) => {
+                            const isStopped = d.changeType === 'Stopped';
+                            const isModified = d.changeType === 'Modified';
+                            
+                            return (
+                              <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5 }}>
+                                {isStopped ? (
+                                  <span style={{ color:'var(--accent-red)', fontWeight:500 }}>
+                                    🔴 Stopped: <span style={{ textDecoration:'line-through', color:'var(--text-primary)' }}>{d.drug}</span>
+                                  </span>
+                                ) : isModified ? (
+                                  <span style={{ color:'var(--accent-orange)', fontWeight:500 }}>
+                                    🟠 Modified: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} • {d.frequency})
+                                  </span>
+                                ) : (
+                                  <span style={{ color:'var(--accent-green)', fontWeight:500 }}>
+                                    ➕ Added: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} • {d.frequency} • {d.duration})
+                                  </span>
+                                )}
+                                {d.notes && <span style={{ fontSize:11, color:'var(--text-muted)', fontStyle:'italic' }}>({d.notes})</span>}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <span style={{ fontSize:12.5, color:'var(--text-muted)' }}>No drug changes on this date.</span>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                      {rx.drugs && rx.drugs.length > 0 ? (
-                        rx.drugs.map((d,i)=>{
-                          const isStopped = d.changeType === 'Stopped';
-                          const isModified = d.changeType === 'Modified';
-                          
-                          return (
-                            <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12.5 }}>
-                              {isStopped ? (
-                                <span style={{ color:'var(--accent-red)', fontWeight:500 }}>
-                                  🛑 Stopped: <span style={{ textDecoration:'line-through', color:'var(--text-primary)' }}>{d.drug}</span>
-                                </span>
-                              ) : isModified ? (
-                                <span style={{ color:'var(--accent-orange)', fontWeight:500 }}>
-                                  🔄 Modified: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} · {d.frequency})
-                                </span>
-                              ) : (
-                                <span style={{ color:'var(--accent-green)', fontWeight:500 }}>
-                                  ➕ Added: <span style={{ color:'var(--text-primary)' }}>{d.drug}</span> ({d.dose} · {d.frequency} · {d.duration})
-                                </span>
-                              )}
-                              {d.notes && <span style={{ fontSize:11, color:'var(--text-muted)', fontStyle:'italic' }}>({d.notes})</span>}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <span style={{ fontSize:12.5, color:'var(--text-muted)' }}>No drug changes in this appointment.</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             )}
           </div>
