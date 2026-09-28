@@ -407,7 +407,7 @@ export default function PatientProfilePage() {
                     <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                       {rx.drugs && rx.drugs.length > 0 ? (
                         rx.drugs.map((d,i)=>{
-                          const isStopped = d.changeType === 'Stopped' || !!d.endDate;
+                          const isStopped = d.changeType === 'Stopped';
                           const isModified = d.changeType === 'Modified';
                           
                           return (
