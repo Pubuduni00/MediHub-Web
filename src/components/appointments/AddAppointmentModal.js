@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
-const EMPTY = { patientId:'', doctorId:'', date:'', time:'', type:'Consultation', details:'', duration:15 };
+const EMPTY = { patientId:'', doctorId:'', date:'', time:'', type:'Consultation', details:'' };
 const TYPES = ['Consultation','Follow-up','Review','Emergency','Procedure','Lab Visit'];
 
 export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' }) {
@@ -149,19 +149,11 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
               {(form.doctorId && form.date && !loadingSlots && availableSlots.length === 0) && <p style={{color:'var(--accent-red)',fontSize:11,marginTop:3}}>No free slots available</p>}
             </div>
           </div>
-          <div className="grid-2">
-            <div className="form-group">
+          <div className="form-group">
               <label className="form-label">Type</label>
               <select className="form-control" value={form.type} onChange={e=>set('type',e.target.value)}>
                 {TYPES.map(t=><option key={t}>{t}</option>)}
               </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Duration (minutes)</label>
-              <select className="form-control" value={form.duration} onChange={e=>set('duration',Number(e.target.value))}>
-                {[15,20,30,45,60,90].map(d=><option key={d} value={d}>{d} min</option>)}
-              </select>
-            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Details / Notes</label>

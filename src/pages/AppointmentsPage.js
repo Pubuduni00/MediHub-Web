@@ -197,7 +197,6 @@ export default function AppointmentsPage() {
                     {/* Time Block */}
                     <div className="appt-time-block">
                       <span className="appt-time-value">{a.time}</span>
-                      <span className="appt-time-duration">{a.duration||30} min</span>
                     </div>
 
                     {/* Patient block */}

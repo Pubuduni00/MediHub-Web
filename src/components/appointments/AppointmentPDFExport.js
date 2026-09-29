@@ -34,7 +34,7 @@ export function exportAppointmentsPDF(appointments, dateStr) {
       autoTable(doc, {
         startY: 56,
         margin: { left: margin, right: margin },
-        head: [['#', 'Time', 'Patient Name', 'Hospital ID', 'Doctor', 'Type', 'Duration', 'Status', 'Details']],
+        head: [['#', 'Time', 'Patient Name', 'Hospital ID', 'Doctor', 'Type', 'Status', 'Details']],
         body: sorted.map((a, i) => [
           i + 1,
           a.time,
@@ -42,7 +42,6 @@ export function exportAppointmentsPDF(appointments, dateStr) {
           a.patientId,
           a.doctorName,
           a.type,
-          `${a.duration || 30} min`,
           a.status,
           a.details || '—',
         ]),
@@ -50,9 +49,9 @@ export function exportAppointmentsPDF(appointments, dateStr) {
         bodyStyles: { fontSize: 8.5, textColor: [26, 43, 60] },
         alternateRowStyles: { fillColor: [248, 251, 255] },
         columnStyles: {
-          0: { cellWidth: 8 }, 1: { cellWidth: 14 }, 2: { cellWidth: 30 },
-          3: { cellWidth: 18 }, 4: { cellWidth: 30 }, 5: { cellWidth: 20 },
-          6: { cellWidth: 16 }, 7: { cellWidth: 18 },
+          0: { cellWidth: 8 }, 1: { cellWidth: 14 }, 2: { cellWidth: 34 },
+          3: { cellWidth: 20 }, 4: { cellWidth: 34 }, 5: { cellWidth: 22 },
+          6: { cellWidth: 20 },
         },
       });
 

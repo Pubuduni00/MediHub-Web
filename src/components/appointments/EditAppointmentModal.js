@@ -164,12 +164,6 @@ export default function EditAppointmentModal({ appointment, onClose }) {
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Duration (minutes)</label>
-            <select className="form-control" value={form.duration} onChange={e=>set('duration',Number(e.target.value))}>
-              {[15,20,30,45,60,90].map(d=><option key={d} value={d}>{d} min</option>)}
-            </select>
-          </div>
-          <div className="form-group">
             <label className="form-label">Details / Notes</label>
             <textarea className="form-control" rows={2} value={form.details||''} onChange={e=>set('details',e.target.value)}/>
           </div>

@@ -177,12 +177,6 @@
   color: var(--primary);
 }
 
-.appt-time-duration {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
 /* Patient / Doctor Details Block */
 .appt-info-block {
   display: flex;
