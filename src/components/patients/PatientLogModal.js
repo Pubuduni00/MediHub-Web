@@ -4,7 +4,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Plus, Trash2, FlaskConical, Pill, Stethoscope } from 'lucide-react';
 
-const EMPTY_DRUG   = { drug:'', dose:'', frequency:'Once daily', duration:'', mealInstruction:'After meals', notes:'' };
+const EMPTY_DRUG   = { drug:'', dose:'', frequency:'Once daily', duration:'Ongoing', mealInstruction:'After meals', notes:'' };
 const EMPTY_INVEST = { type:'', dateOrdered:'', results:'', referenceRange:'', status:'Normal', notes:'' };
 const EMPTY_EXAM   = {
   generalExamination:'',
@@ -307,7 +307,9 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                           </select>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:90 }}>
-                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.duration} onChange={e=>updateDrug(i,'duration',e.target.value)} placeholder="e.g. 30 days"/>
+                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.duration || 'Ongoing'} onChange={e=>updateDrug(i,'duration',e.target.value)}>
+                              {['Ongoing', '3 days', '5 days', '7 days', '14 days', '30 days'].map(m=><option key={m}>{m}</option>)}
+                            </select>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:130 }}>
                           <select className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.mealInstruction} onChange={e=>updateDrug(i,'mealInstruction',e.target.value)}>
