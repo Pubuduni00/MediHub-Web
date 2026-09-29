@@ -191,8 +191,8 @@ async function syncPatientByEmailIfFirebaseUserExists(email) {
             instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
             prescribedBy: log.doctorName,
             startDate: new Date(log.date).getTime(),
-            endDate: null,
-            takenStatus: {},
+              endDate: calculateEndDate(new Date(log.date).getTime(), drug.duration),
+              takenStatus: {},
           });
         }
       }
@@ -224,6 +224,17 @@ try {
 } catch (err) {
   console.warn('Firebase Admin not initialized (missing serviceAccountKey.json):', err.message);
   console.warn('Firebase sync will be disabled. Add serviceAccountKey.json to enable it.');
+}
+
+// Helper to calculate end date from duration dropdown
+function calculateEndDate(startDateMs, durationStr) {
+  if (!durationStr || durationStr === 'Ongoing') return null;
+  const daysMatch = durationStr.match(/(\d+)/);
+  if (daysMatch) {
+    const days = parseInt(daysMatch[1], 10);
+    return startDateMs + (days * 24 * 60 * 60 * 1000);
+  }
+  return null;
 }
 
 // Helper to sync patient data to Firestore
@@ -1824,8 +1835,8 @@ app.post('/api/patient-logs', async (req, res) => {
           instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
           prescribedBy: doctorName,
           startDate: startDate,
-          endDate: null,
-          takenStatus: {},
+            endDate: calculateEndDate(startDate, drug.duration),
+            takenStatus: {},
         });
       }
       console.log(`Synced ${newDrugs.length} new medications to Firestore for patient ${patientId}`);
@@ -2035,8 +2046,8 @@ app.post('/api/sync/patient/:id', async (req, res) => {
           instructions: `${drug.mealInstruction || ''} ${drug.notes || ''}`.trim(),
           prescribedBy: log.doctorName,
           startDate: new Date(log.date).getTime(),
-          endDate: drug.endDate ? new Date(drug.endDate).getTime() : null,
-          takenStatus: {},
+            endDate: drug.endDate ? new Date(drug.endDate).getTime() : calculateEndDate(new Date(log.date).getTime(), drug.duration),
+            takenStatus: {},
         });
       }
     }
