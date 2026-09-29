@@ -350,6 +350,21 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const deleteDoctor = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/doctors/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setDoctors(prev => prev.filter(d => d.id !== id));
+        return true;
+      }
+    } catch (err) {
+      console.error("Failed to delete doctor:", err);
+    }
+    return false;
+  };
+
   // ── Alerts ──
   const markAlertRead = async (id) => {
     try {
@@ -386,7 +401,7 @@ export const DataProvider = ({ children }) => {
       addAppointment, updateAppointment, deleteAppointment, getAppointmentsForDate, getAppointmentsForDoctor,
       addPatientLog, getLogsForPatient, getLogsForDate,
       addPrescription, getPrescriptionsForPatient, stopMedication, editMedication, refreshData,
-      addDoctor, updateDoctor, setDoctors, setAppointments,
+      addDoctor, updateDoctor, deleteDoctor, setDoctors, setAppointments,
       markAlertRead, markAllAlertsRead, unreadCount,
       setSymptomLogs,
     }}>

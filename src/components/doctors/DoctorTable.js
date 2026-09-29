@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Search, UserPlus, Edit2 } from 'lucide-react';
+import { Search, UserPlus, Edit2, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import Badge from '../common/Badge';
 import Avatar from '../common/Avatar';
 import EmptyState from '../common/EmptyState';
 
-export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments }) {
+export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments, onDelete }) {
   const [search, setSearch] = useState('');
+  const { isStaff } = useAuth();
 
   const filtered = doctors.filter(d => {
     const q = search.toLowerCase();
@@ -75,14 +77,30 @@ export default function DoctorTable({ doctors, onAdd, onEdit, onViewAppointments
                   <td style={{ fontSize:12.5, color:'var(--text-muted)' }}>{d.joinDate}</td>
                   <td><Badge label={d.status} variant={d.status==='Active'?'success':'muted'} dot /></td>
                   <td>
-                    <button 
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: 4, height: 'auto', minWidth: 'unset', display: 'flex', alignItems: 'center' }}
-                      onClick={() => onEdit && onEdit(d)}
-                      title="Edit Doctor Profile"
-                    >
-                      <Edit2 size={13} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button 
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: 4, height: 'auto', minWidth: 'unset', display: 'flex', alignItems: 'center' }}
+                        onClick={() => onEdit && onEdit(d)}
+                        title="Edit Doctor Profile"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      
+                      {isStaff && onDelete && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: 4, height: 'auto', minWidth: 'unset', display: 'flex', alignItems: 'center', color: 'var(--danger)' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(d);
+                          }}
+                          title="Delete Doctor"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

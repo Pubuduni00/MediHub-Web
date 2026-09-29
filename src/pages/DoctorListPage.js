@@ -7,10 +7,16 @@ import DoctorAppointmentsModal from '../components/doctors/DoctorAppointmentsMod
 import './DoctorListPage.css';
 
 export default function DoctorListPage() {
-  const { doctors } = useData();
+  const { doctors, deleteDoctor } = useData();
   const [showAdd, setShowAdd] = useState(false);
   const [editDoctor, setEditDoctor] = useState(null);
   const [viewDoctorAppts, setViewDoctorAppts] = useState(null);
+
+  const handleDelete = async (doctor) => {
+    if (window.confirm(`Are you sure you want to delete Dr. ${doctor.name}?`)) {
+      await deleteDoctor(doctor.id);
+    }
+  };
 
   return (
     <div>
@@ -26,6 +32,7 @@ export default function DoctorListPage() {
           onAdd={() => setShowAdd(true)} 
           onEdit={(doc) => setEditDoctor(doc)}
           onViewAppointments={(doc) => setViewDoctorAppts(doc)}
+          onDelete={handleDelete}
         />
       </div>
       

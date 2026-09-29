@@ -1316,6 +1316,33 @@ app.put('/api/doctors/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/doctors/:id', async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const existing = await dbHelpers.get('SELECT * FROM doctors WHERE id = ?', [doctorId]);
+    if (!existing) return res.status(404).json({ error: 'Doctor not found' });
+
+    // Clean up foreign key references
+    await dbHelpers.run('DELETE FROM doctor_availability WHERE doctorId = ?', [doctorId]);
+    await dbHelpers.run('DELETE FROM doctor_patients WHERE doctor_id = ?', [doctorId]);
+    await dbHelpers.run('DELETE FROM reschedule_requests WHERE doctorId = ?', [doctorId]);
+    await dbHelpers.run('DELETE FROM appointments WHERE doctorId = ?', [doctorId]);
+    
+    const logs = await dbHelpers.all('SELECT id FROM patient_logs WHERE doctorId = ?', [doctorId]);
+    for (const log of logs) {
+      await dbHelpers.run('DELETE FROM prescriptions WHERE logId = ?', [log.id]);
+    }
+    await dbHelpers.run('DELETE FROM patient_logs WHERE doctorId = ?', [doctorId]);
+
+    // Finally delete the doctor
+    await dbHelpers.run('DELETE FROM doctors WHERE id = ?', [doctorId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete doctor error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // SET Doctor Availability Slots
 app.post('/api/doctors/:id/availability', async (req, res) => {
   try {
