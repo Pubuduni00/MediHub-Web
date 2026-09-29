@@ -67,6 +67,8 @@ export default function PatientProfilePage() {
     setEndingSession(true);
     await updateAppointment(redirectApptId, { status: 'Completed' });
     sessionStorage.removeItem('active_appt_id');
+      sessionStorage.removeItem('activeAppointmentId');
+      sessionStorage.removeItem('activePatientId');
     navigate('/appointments');
   };
 
@@ -93,21 +95,6 @@ export default function PatientProfilePage() {
           <ArrowLeft size={14}/> Back
         </button>
         <div style={{ display: 'flex', gap: 8 }}>
-          {hasActiveSession && (
-            <button
-              onClick={stopSession}
-              style={{
-                display:'flex', alignItems:'center', gap:6,
-                background:'#dc2626', color:'#fff',
-                border:'none', borderRadius:8, padding:'7px 14px',
-                fontSize:13, fontWeight:700, cursor:'pointer',
-                boxShadow:'0 2px 8px rgba(220,38,38,0.3)'
-              }}
-              title="End this appointment session"
-            >
-              <Square size={13} fill="currentColor"/> Stop Session
-            </button>
-          )}
           {redirectApptId && isDoctor && (
             <button
               onClick={handleEndSession}
