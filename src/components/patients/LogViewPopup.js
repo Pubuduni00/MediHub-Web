@@ -47,6 +47,7 @@ export default function LogViewPopup({ logs, date, onClose }) {
                 if (log.examination.chiefComplaint) mergedExamination.chiefComplaint = log.examination.chiefComplaint;
                 if (log.examination.clinicalFindings) mergedExamination.clinicalFindings = log.examination.clinicalFindings;
                 if (log.examination.diagnosis) mergedExamination.diagnosis = log.examination.diagnosis;
+                  ['generalExamination', 'cardiovascular', 'respiratory', 'nervous', 'locomotor', 'gastrointestinal', 'additional'].forEach(k => { if (log.examination[k]) mergedExamination[k] = log.examination[k]; });
                 if (log.examination.plan) mergedExamination.plan = log.examination.plan;
                 ['bp','pulse','temp','spo2','weight','height'].forEach(f => {
                    if (log.examination[f]) mergedExamination[f] = log.examination[f];
@@ -112,7 +113,14 @@ export default function LogViewPopup({ logs, date, onClose }) {
                           )}
                         </div>
                       )}
-                      {mergedExamination.clinicalFindings && (
+                      {mergedExamination.generalExamination && <div className="info-row"><span className="info-label">General</span><span className="info-value">{mergedExamination.generalExamination}</span></div>}
+                        {mergedExamination.cardiovascular && <div className="info-row"><span className="info-label">Cardio</span><span className="info-value">{mergedExamination.cardiovascular}</span></div>}
+                        {mergedExamination.respiratory && <div className="info-row"><span className="info-label">Resp</span><span className="info-value">{mergedExamination.respiratory}</span></div>}
+                        {mergedExamination.nervous && <div className="info-row"><span className="info-label">Nervous</span><span className="info-value">{mergedExamination.nervous}</span></div>}
+                        {mergedExamination.locomotor && <div className="info-row"><span className="info-label">Locomotor</span><span className="info-value">{mergedExamination.locomotor}</span></div>}
+                        {mergedExamination.gastrointestinal && <div className="info-row"><span className="info-label">Gastro</span><span className="info-value">{mergedExamination.gastrointestinal}</span></div>}
+                        {mergedExamination.additional && <div className="info-row"><span className="info-label">Additional</span><span className="info-value">{mergedExamination.additional}</span></div>}
+                        {mergedExamination.clinicalFindings && (
                         <div className="info-row"><span className="info-label">Clinical Findings</span><span className="info-value">{mergedExamination.clinicalFindings}</span></div>
                       )}
                       {mergedExamination.diagnosis && (
