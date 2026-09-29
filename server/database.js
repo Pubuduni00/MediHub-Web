@@ -172,7 +172,6 @@ async function initDatabase() {
         type TEXT,
         status TEXT,
         details TEXT,
-        duration INTEGER,
         investigations TEXT,
         investigationNotes TEXT,
         FOREIGN KEY (patientId) REFERENCES patients(id),
@@ -358,15 +357,15 @@ async function initDatabase() {
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
       const dayAfter = new Date(Date.now() + 172800000).toISOString().split('T')[0];
       const appointments = [
-        ['AP001', 'PT001', 'Rohan Fernando', 'DR001', 'Dr. Amara Patel', today, '09:00', 'Follow-up', 'Pending', 'Routine cardiac checkup', 30, JSON.stringify(['FBC', 'ECG Report', 'Blood Pressure Log']), 'Please bring all original reports. Fasting required.'],
-        ['AP002', 'PT002', 'Kamala Perera', 'DR002', 'Dr. James Wilson', today, '10:30', 'Consultation', 'Pending', 'First visit - general checkup', 45, JSON.stringify([]), null],
-        ['AP003', 'PT003', 'Arun Wickramasinghe', 'DR001', 'Dr. Amara Patel', today, '11:00', 'Review', 'Pending', 'ECG review', 30, JSON.stringify(['ECG Report', 'Chest X-Ray']), 'Wear comfortable clothing for ECG.'],
-        ['AP004', 'PT004', 'Sandya Jayawardena', 'DR002', 'Dr. James Wilson', tomorrow, '14:00', 'Follow-up', 'Pending', 'Blood test results', 20, JSON.stringify([]), null],
-        ['AP005', 'PT005', 'Malik Bandara', 'DR003', 'Dr. Priya Nair', dayAfter, '09:30', 'Consultation', 'Pending', 'Neurological assessment', 60, JSON.stringify(['MRI Brain Report', 'Previous neurology notes']), 'Bring any previous scan reports.']
+        ['AP001', 'PT001', 'Rohan Fernando', 'DR001', 'Dr. Amara Patel', today, '09:00', 'Follow-up', 'Pending', 'Routine cardiac checkup', JSON.stringify(['FBC', 'ECG Report', 'Blood Pressure Log']), 'Please bring all original reports. Fasting required.'],
+        ['AP002', 'PT002', 'Kamala Perera', 'DR002', 'Dr. James Wilson', today, '10:30', 'Consultation', 'Pending', 'First visit - general checkup', JSON.stringify([]), null],
+        ['AP003', 'PT003', 'Arun Wickramasinghe', 'DR001', 'Dr. Amara Patel', today, '11:00', 'Review', 'Pending', 'ECG review', JSON.stringify(['ECG Report', 'Chest X-Ray']), 'Wear comfortable clothing for ECG.'],
+        ['AP004', 'PT004', 'Sandya Jayawardena', 'DR002', 'Dr. James Wilson', tomorrow, '14:00', 'Follow-up', 'Pending', 'Blood test results', JSON.stringify([]), null],
+        ['AP005', 'PT005', 'Malik Bandara', 'DR003', 'Dr. Priya Nair', dayAfter, '09:30', 'Consultation', 'Pending', 'Neurological assessment', JSON.stringify(['MRI Brain Report', 'Previous neurology notes']), 'Bring any previous scan reports.']
       ];
       for (const ap of appointments) {
         await dbHelpers.run(
-          'INSERT INTO appointments (id, patientId, patientName, doctorId, doctorName, date, time, type, status, details, duration, investigations, investigationNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ap
+          'INSERT INTO appointments (id, patientId, patientName, doctorId, doctorName, date, time, type, status, details, investigations, investigationNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ap
         );
       }
 

@@ -66,6 +66,7 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                 ...d,
                 logId: rx.logId || rx.id,
                 rxId: rx.id,
+                addedBy: rx.addedBy || rx.doctorId || '',
                 isExisting: true,
                 status: 'Continue',
                 originalDose: d.dose || '',
@@ -288,7 +289,10 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {drugs.map((d,i)=>(
+                    {drugs.map((d,i)=>{
+                      const isOwnDrug = !d.isExisting || d.addedBy === user?.id;
+                      const readOnlyStyle = !isOwnDrug ? { opacity:0.6, cursor:'not-allowed', background:'var(--bg-muted)' } : {};
+                      return (
                       <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
                         <td style={{ padding:'8px 10px', fontSize:13, color:'var(--text-muted)', width:28 }}>{i+1}</td>
                         <td style={{ padding:'6px 6px', minWidth:130 }}>
@@ -299,28 +303,29 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                           )}
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:80 }}>
-                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.dose} onChange={e=>updateDrug(i,'dose',e.target.value)} placeholder="e.g. 5mg"/>
+                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13, ...readOnlyStyle }} value={d.dose} onChange={e=>updateDrug(i,'dose',e.target.value)} placeholder="e.g. 5mg" disabled={!isOwnDrug} title={!isOwnDrug ? 'Added by another doctor' : ''}/>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:130 }}>
-                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.frequency} onChange={e=>updateDrug(i,'frequency',e.target.value)}>
+                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13, ...readOnlyStyle }} value={d.frequency} onChange={e=>updateDrug(i,'frequency',e.target.value)} disabled={!isOwnDrug} title={!isOwnDrug ? 'Added by another doctor' : ''}>
                             {FREQ.map(f=><option key={f}>{f}</option>)}
                           </select>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:90 }}>
-                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.duration || 'Ongoing'} onChange={e=>updateDrug(i,'duration',e.target.value)}>
+                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13, ...readOnlyStyle }} value={d.duration || 'Ongoing'} onChange={e=>updateDrug(i,'duration',e.target.value)} disabled={!isOwnDrug} title={!isOwnDrug ? 'Added by another doctor' : ''}>
                               {['Ongoing', '3 days', '5 days', '7 days', '14 days', '30 days'].map(m=><option key={m}>{m}</option>)}
                             </select>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:130 }}>
-                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.mealInstruction} onChange={e=>updateDrug(i,'mealInstruction',e.target.value)}>
+                          <select className="form-control" style={{ padding:'5px 8px', fontSize:13, ...readOnlyStyle }} value={d.mealInstruction} onChange={e=>updateDrug(i,'mealInstruction',e.target.value)} disabled={!isOwnDrug} title={!isOwnDrug ? 'Added by another doctor' : ''}>
                             {MEAL.map(m=><option key={m}>{m}</option>)}
                           </select>
                         </td>
                         <td style={{ padding:'6px 6px', minWidth:120 }}>
-                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13 }} value={d.notes} onChange={e=>updateDrug(i,'notes',e.target.value)} placeholder="Special instructions..."/>
+                          <input className="form-control" style={{ padding:'5px 8px', fontSize:13, ...readOnlyStyle }} value={d.notes} onChange={e=>updateDrug(i,'notes',e.target.value)} placeholder="Special instructions..." disabled={!isOwnDrug} title={!isOwnDrug ? 'Added by another doctor' : ''}/>
                         </td>
                         <td style={{ padding:'6px 8px', minWidth:120 }}>
                           {d.isExisting ? (
+                            isOwnDrug ? (
                             <select 
                               className="form-control" 
                               style={{ 
@@ -337,6 +342,9 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                               <option value="Continue" style={{ color:'var(--accent-green)' }}>Continue</option>
                               <option value="Stop" style={{ color:'var(--accent-red)' }}>Stop</option>
                             </select>
+                            ) : (
+                            <span style={{ fontSize:11, color:'var(--text-muted)', fontStyle:'italic', display:'block', textAlign:'center' }} title="You cannot edit drugs added by another doctor">View only</span>
+                            )
                           ) : (
                             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                               <span className="badge badge-secondary" style={{ fontSize:10, background:'var(--primary-light)', color:'var(--primary)' }}>New</span>
@@ -347,7 +355,8 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

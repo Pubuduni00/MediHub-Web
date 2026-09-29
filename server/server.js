@@ -14,10 +14,17 @@ app.use(express.json());
 
 app.post('/api/patients/:patientId/medications/:medId/stop', async (req, res) => {
   const { patientId, medId } = req.params;
+  const { doctorId: requestingDoctorId } = req.body || {};
   try {
     const parts = medId.split('_');
     const logId = parts[0];
     const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+
+    // Authorization: verify the requesting doctor owns this drug
+    const originLog = await dbHelpers.get('SELECT doctorId FROM patient_logs WHERE id = ?', [logId]);
+    if (originLog && requestingDoctorId && originLog.doctorId !== requestingDoctorId) {
+      return res.status(403).json({ error: 'You can only stop drugs that you added' });
+    }
 
     // 1. Get the patient's firebase_uid
     const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
@@ -64,11 +71,17 @@ app.post('/api/patients/:patientId/medications/:medId/stop', async (req, res) =>
 
 app.post('/api/patients/:patientId/medications/:medId/edit', async (req, res) => {
   const { patientId, medId } = req.params;
-  const { dose, frequency, duration, mealInstruction, notes } = req.body;
+  const { dose, frequency, duration, mealInstruction, notes, doctorId: requestingDoctorId } = req.body;
   try {
     const parts = medId.split('_');
     const logId = parts[0];
     const drugName = parts.slice(1).join(' ').replace(/_/g, ' ');
+
+    // Authorization: verify the requesting doctor owns this drug
+    const originLog = await dbHelpers.get('SELECT doctorId FROM patient_logs WHERE id = ?', [logId]);
+    if (originLog && requestingDoctorId && originLog.doctorId !== requestingDoctorId) {
+      return res.status(403).json({ error: 'You can only edit drugs that you added' });
+    }
 
     // 1. Get the patient's firebase_uid
     const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
@@ -1348,7 +1361,7 @@ app.get('/api/appointments', async (req, res) => {
 });
 
 app.post('/api/appointments', async (req, res) => {
-  const { patientId, patientName, doctorId, doctorName, date, time, type, status, details, duration, investigations, investigationNotes } = req.body;
+  const { patientId, patientName, doctorId, doctorName, date, time, type, status, details, investigations, investigationNotes } = req.body;
   if (!patientId || !doctorId || !date || !time) {
     return res.status(400).json({ error: 'patientId, doctorId, date and time required' });
   }
@@ -1357,8 +1370,8 @@ app.post('/api/appointments', async (req, res) => {
     const investigationsStr = investigations ? JSON.stringify(investigations) : JSON.stringify([]);
 
     await dbHelpers.run(
-      'INSERT INTO appointments (id, patientId, patientName, doctorId, doctorName, date, time, type, status, details, duration, investigations, investigationNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, patientId, patientName, doctorId, doctorName, date, time, type || 'Consultation', status || 'Pending', details, duration || 30, investigationsStr, investigationNotes || null]
+      'INSERT INTO appointments (id, patientId, patientName, doctorId, doctorName, date, time, type, status, details, investigations, investigationNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, patientId, patientName, doctorId, doctorName, date, time, type || 'Consultation', status || 'Pending', details, investigationsStr, investigationNotes || null]
     );
 
     // Assign doctor to patient if not assigned
@@ -1386,7 +1399,7 @@ app.post('/api/appointments', async (req, res) => {
       });
     }
 
-    res.status(201).json({ id, patientId, patientName, doctorId, doctorName, date, time, type: type || 'Consultation', status: status || 'Pending', details, duration: duration || 30, investigations: investigations || [] });
+    res.status(201).json({ id, patientId, patientName, doctorId, doctorName, date, time, type: type || 'Consultation', status: status || 'Pending', details, investigations: investigations || [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -1394,7 +1407,7 @@ app.post('/api/appointments', async (req, res) => {
 });
 
 app.put('/api/appointments/:id', async (req, res) => {
-  const { status, details, date, time, type, duration, investigations, investigationNotes } = req.body;
+  const { status, details, date, time, type, investigations, investigationNotes } = req.body;
   try {
     const existing = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Appointment not found' });
@@ -1405,11 +1418,11 @@ app.put('/api/appointments/:id', async (req, res) => {
       `UPDATE appointments SET
         status = COALESCE(?, status), details = COALESCE(?, details),
         date = COALESCE(?, date), time = COALESCE(?, time),
-        type = COALESCE(?, type), duration = COALESCE(?, duration),
+        type = COALESCE(?, type),
         investigations = COALESCE(?, investigations),
         investigationNotes = COALESCE(?, investigationNotes)
        WHERE id = ?`,
-      [status, details, date, time, type, duration, investigationsStr, investigationNotes, req.params.id]
+      [status, details, date, time, type, investigationsStr, investigationNotes, req.params.id]
     );
 
     const updated = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
@@ -1649,6 +1662,12 @@ app.post('/api/patient-logs', async (req, res) => {
 
         if (drug.isExisting) {
           const medId = `${drug.logId || drug.rxId}_${drug.drug.replace(/\s+/g, '_')}`;
+
+          // Authorization: skip modifications for drugs not owned by the requesting doctor
+          const originLog = await dbHelpers.get('SELECT doctorId FROM patient_logs WHERE id = ?', [drug.logId]);
+          if (originLog && originLog.doctorId !== doctorId) {
+            continue; // Not this doctor's drug — skip modification
+          }
 
           if (drug.status === 'Stop') {
             // Stop in Firestore
