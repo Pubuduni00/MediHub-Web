@@ -113,16 +113,18 @@ export default function PatientLogModal({ isOpen, onClose, patientId }) {
       : [];
     const activeApptId = sessionStorage.getItem('activeAppointmentId') || sessionStorage.getItem('active_appt_id');
 
-    const logPayload = {
-      patientId,
-      doctorId: user?.id,
-      doctorName: user?.name,
-      examination: exam,
-      drugs,
-      investigations,
-      nextSessionInvestigations: nextSessionInvs,
-      nextSessionNotes: nextSessionNotes || null,
-    };
+    const validDrugs = drugs.filter(d => d.drug && d.drug.trim() !== '');
+      const validInvs = investigations.filter(i => (i.type || i.investigation) && String(i.type || i.investigation).trim() !== '');
+      const logPayload = {
+        patientId,
+        doctorId: user?.id,
+        doctorName: user?.name,
+        examination: exam,
+        drugs: validDrugs,
+        investigations: validInvs,
+        nextSessionInvestigations: nextSessionInvs,
+        nextSessionNotes: nextSessionNotes || null,
+      };
     if (activeApptId) {
       logPayload.activeAppointmentId = activeApptId;
       logPayload.appointmentId = activeApptId;
