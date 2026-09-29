@@ -342,7 +342,9 @@ export default function PatientProfilePage() {
                   let totalInvest = 0;
                   dateLogs.forEach(l => {
                     if (l.drugs) l.drugs.forEach(d => { if(d.drug) uniqueDrugs.add(d.drug.toLowerCase().trim()); });
-                    if (l.investigations) totalInvest += l.investigations.length;
+                    if (l.investigations) {
+                        totalInvest += l.investigations.filter(i => (i.type || i.investigation) && String(i.type || i.investigation).trim() !== '').length;
+                      }
                   });
                   return (
                     <div key={date} 
