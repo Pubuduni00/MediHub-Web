@@ -544,8 +544,7 @@ function initFirestoreListeners() {
 }
 
 // Helper: get today's date as YYYY-MM-DD in local time (avoids UTC offset issues)
-function getLocalDateString() {
-  const d = new Date();
+function getLocalDateString(d = new Date()) {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -557,29 +556,39 @@ function getLocalDateString() {
 async function checkAndMarkMissedAppointments() {
   try {
     const now = new Date();
-    const todayStr = getLocalDateString();
-    // Current local time as HH:MM string for comparison
-    const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const cutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const cutoffDate = getLocalDateString(cutoff);
+    const cutoffTime = `${String(cutoff.getHours()).padStart(2, '0')}:${String(cutoff.getMinutes()).padStart(2, '0')}`;
 
-    // 1. All past-day appointments not yet resolved
+    // 1. Appointments before the two-hour cutoff that are not yet resolved
     const pastDayAppts = await dbHelpers.all(
-      "SELECT * FROM appointments WHERE date < ? AND status NOT IN ('Completed', 'Cancelled', 'Missed')",
-      [todayStr]
+      "SELECT * FROM appointments WHERE date < ? AND status NOT IN ('Completed', 'Attended', 'Cancelled', 'Missed')",
+      [cutoffDate]
     );
 
-    // 2. Today's appointments whose time has already passed and are not yet resolved
-    const todayElapsedAppts = await dbHelpers.all(
-      "SELECT * FROM appointments WHERE date = ? AND time < ? AND status NOT IN ('Completed', 'Cancelled', 'Missed')",
-      [todayStr, nowTime]
+    // 2. Appointments at or before the cutoff time that are not yet resolved
+    const cutoffDateAppts = await dbHelpers.all(
+      "SELECT * FROM appointments WHERE date = ? AND time <= ? AND status NOT IN ('Completed', 'Attended', 'Cancelled', 'Missed')",
+      [cutoffDate, cutoffTime]
     );
 
-    const missedAppts = [...pastDayAppts, ...todayElapsedAppts];
+    // Earlier missed statuses may have been set before the two-hour grace period.
+    const notYetDueMissedAppts = await dbHelpers.all(
+      "SELECT * FROM appointments WHERE (date > ? OR (date = ? AND time > ?)) AND status = 'Missed'",
+      [cutoffDate, cutoffDate, cutoffTime]
+    );
 
-    for (const appt of missedAppts) {
-      console.log(`Marking appointment ${appt.id} as Missed`);
+    const appointmentsToUpdate = [
+      ...pastDayAppts.map(appt => ({ ...appt, nextStatus: 'Missed' })),
+      ...cutoffDateAppts.map(appt => ({ ...appt, nextStatus: 'Missed' })),
+      ...notYetDueMissedAppts.map(appt => ({ ...appt, nextStatus: 'Pending' }))
+    ];
+
+    for (const appt of appointmentsToUpdate) {
+      console.log(`Marking appointment ${appt.id} as ${appt.nextStatus}`);
       await dbHelpers.run(
-        "UPDATE appointments SET status = 'Missed' WHERE id = ?",
-        [appt.id]
+        'UPDATE appointments SET status = ? WHERE id = ?',
+        [appt.nextStatus, appt.id]
       );
       const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [appt.patientId]);
       if (patient && patient.firebaseUid) {
@@ -590,7 +599,7 @@ async function checkAndMarkMissedAppointments() {
           clinic: appt.details || appt.type || 'Clinic',
           doctorName: appt.doctorName,
           requestDetails: appt.details || '',
-          status: 'missed',
+          status: appt.nextStatus === 'Missed' ? 'missed' : 'upcoming',
           rescheduleStatus: 'none',
           investigations: investigations,
           investigationNotes: appt.investigationNotes || null,
@@ -1439,6 +1448,13 @@ app.put('/api/appointments/:id', async (req, res) => {
     const existing = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Appointment not found' });
 
+    let updatedStatus = status || existing.status;
+    if (!['Completed', 'Attended', 'Cancelled'].includes(updatedStatus)) {
+      const appointmentDateTime = new Date(`${date || existing.date}T${time || existing.time}`);
+      const missedCutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      updatedStatus = appointmentDateTime > missedCutoff ? 'Pending' : 'Missed';
+    }
+
     const investigationsStr = investigations ? JSON.stringify(investigations) : undefined;
 
     await dbHelpers.run(
@@ -1449,7 +1465,7 @@ app.put('/api/appointments/:id', async (req, res) => {
         investigations = COALESCE(?, investigations),
         investigationNotes = COALESCE(?, investigationNotes)
        WHERE id = ?`,
-      [status, details, date, time, type, investigationsStr, investigationNotes, req.params.id]
+      [updatedStatus, details, date, time, type, investigationsStr, investigationNotes, req.params.id]
     );
 
     const updated = await dbHelpers.get('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
@@ -1463,7 +1479,7 @@ app.put('/api/appointments/:id', async (req, res) => {
       await syncAppointmentToFirestore(patient.firebaseUid, req.params.id, {
         dateTime: apptDateTime,
         status: ((updated.status || '').toLowerCase() === 'confirmed' || (updated.status || '').toLowerCase() === 'pending') ? 'upcoming'
-          : (updated.status || '').toLowerCase() === 'completed' ? 'completed'
+          : ['completed', 'attended'].includes((updated.status || '').toLowerCase()) ? 'completed'
             : (updated.status || '').toLowerCase() === 'cancelled' ? 'missed'
               : (updated.status || '').toLowerCase() === 'missed' ? 'missed'
                 : 'upcoming',
