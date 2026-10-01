@@ -5,7 +5,7 @@ import App from './App';
 import './styles/globals.css';
 
 // Replace with your real Google Client ID when ready
-const GOOGLE_CLIENT_ID = '567314274032-3fstjj1dbnc53kge7m0qr5l2mrftogcj.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '27363179803-pp1e4qf5t37b1p2ist357kjinfcfvheh.apps.googleusercontent.com';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
