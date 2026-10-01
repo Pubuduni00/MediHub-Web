@@ -29,7 +29,8 @@ export default function AddAppointmentModal({ isOpen, onClose, prefillDate='' })
   const fetchSlots = async (docId, dateStr) => {
     try {
       setLoadingSlots(true);
-      const res = await fetch(`http://localhost:5000/api/doctors/${docId}/availability?date=${dateStr}`);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_URL}/doctors/${docId}/availability?date=${dateStr}`);
       const data = await res.json();
       
       let slots = data.filter(s => !s.isBooked);

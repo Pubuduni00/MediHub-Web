@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Check, X, Clock, AlertCircle, Calendar, MessageSquare, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
-const API = 'http://localhost:5000';
+const API = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 function formatDate(dateStr) {
