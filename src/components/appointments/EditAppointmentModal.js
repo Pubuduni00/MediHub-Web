@@ -28,7 +28,8 @@ export default function EditAppointmentModal({ appointment, onClose }) {
   const fetchSlots = async (docId, dateStr) => {
     try {
       setLoadingSlots(true);
-      const res = await fetch(`http://localhost:5000/api/doctors/${docId}/availability?date=${dateStr}`);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_URL}/doctors/${docId}/availability?date=${dateStr}`);
       const data = await res.json();
       
       // Filter out slots that are booked, EXCEPT the currently booked slot of this appointment (if the date is the same)
