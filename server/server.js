@@ -797,7 +797,27 @@ app.post('/api/auth/link-firebase', async (req, res) => {
       privacyAccepted: false,
     });
 
-    console.log(`Linked Firebase UID ${firebase_uid} to patient ${patient.id}`);
+    // Sync all historical active appointments for this patient to Firestore
+    const appointments = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
+    for (const appt of appointments) {
+      const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+      const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
+      await syncAppointmentToFirestore(firebase_uid, appt.id, {
+        dateTime: apptDateTime,
+        clinic: appt.details || appt.type || 'Clinic',
+        doctorName: appt.doctorName,
+        requestDetails: appt.details || '',
+        status: (appt.status === 'Confirmed' || appt.status === 'Pending') ? 'upcoming'
+          : appt.status === 'Completed' ? 'completed'
+            : appt.status === 'Cancelled' ? 'missed'
+              : 'upcoming',
+        rescheduleStatus: 'none',
+        investigations: investigations,
+        investigationNotes: appt.investigationNotes || null,
+      });
+    }
+
+    console.log(`Linked Firebase UID ${firebase_uid} to patient ${patient.id} and synced ${appointments.length} appointments`);
     return res.json({ success: true, patientId: patient.id });
   } catch (err) {
     console.error('Link Firebase error:', err);
