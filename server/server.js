@@ -172,7 +172,7 @@ async function syncPatientByEmailIfFirebaseUserExists(email) {
       // 4. Sync all active appointments for this patient
       const appointments = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
       for (const appt of appointments) {
-        const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+        const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
         const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
         await syncAppointmentToFirestore(firebaseUid, appt.id, {
           dateTime: apptDateTime,
@@ -245,6 +245,12 @@ try {
 }
 
 // Helper to calculate end date from duration dropdown
+function clinicDateTimeToEpoch(date, time) {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes, seconds = 0] = time.split(':').map(Number);
+  return Date.UTC(year, month - 1, day, hours, minutes, seconds) - (330 * 60 * 1000);
+}
+
 function calculateEndDate(startDateMs, durationStr) {
   if (!durationStr || durationStr === 'Ongoing') return null;
   const daysMatch = durationStr.match(/(\d+)/);
@@ -356,7 +362,7 @@ function initFirestoreListeners() {
                 // Sync appointments
                 const appts = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
                 for (const appt of appts) {
-                  const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+                  const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
                   const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
                   await syncAppointmentToFirestore(firebaseUid, appt.id, {
                     dateTime: apptDateTime,
@@ -597,7 +603,7 @@ async function checkAndMarkMissedAppointments() {
       );
       const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [appt.patientId]);
       if (patient && patient.firebaseUid) {
-        const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+        const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
         const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
         await syncAppointmentToFirestore(patient.firebaseUid, appt.id, {
           dateTime: apptDateTime,
@@ -800,7 +806,7 @@ app.post('/api/auth/link-firebase', async (req, res) => {
     // Sync all historical active appointments for this patient to Firestore
     const appointments = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
     for (const appt of appointments) {
-      const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+        const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
       const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
       await syncAppointmentToFirestore(firebase_uid, appt.id, {
         dateTime: apptDateTime,
@@ -914,8 +920,7 @@ app.post('/api/mobile/reschedule-reply', async (req, res) => {
           ['Approved', request.id]
         );
 
-        const newDateStr = `${request.suggestedDate}T${request.suggestedTime}:00`;
-        const newDateTime = new Date(newDateStr).getTime();
+        const newDateTime = clinicDateTimeToEpoch(request.suggestedDate, request.suggestedTime);
 
         await syncAppointmentToFirestore(firebase_uid, appointment_id, {
           rescheduleStatus: 'accepted',
@@ -1446,7 +1451,7 @@ app.post('/api/appointments', async (req, res) => {
     // ── Sync appointment to Firestore for mobile app ──
     const patient = await dbHelpers.get('SELECT firebase_uid FROM patients WHERE id = ?', [patientId]);
     if (patient && patient.firebaseUid) {
-      const apptDateTime = new Date(`${date}T${time}`).getTime();
+      const apptDateTime = clinicDateTimeToEpoch(date, time);
       // Run Firestore sync asynchronously in the background to avoid response delay
       syncAppointmentToFirestore(patient.firebaseUid, id, {
         dateTime: apptDateTime,
@@ -1500,7 +1505,7 @@ app.put('/api/appointments/:id', async (req, res) => {
     if (patient && patient.firebaseUid) {
       const updateDate = updated.date || existing.date;
       const updateTime = updated.time || existing.time;
-      const apptDateTime = new Date(`${updateDate}T${updateTime}`).getTime();
+      const apptDateTime = clinicDateTimeToEpoch(updateDate, updateTime);
       await syncAppointmentToFirestore(patient.firebaseUid, req.params.id, {
         dateTime: apptDateTime,
         status: ((updated.status || '').toLowerCase() === 'confirmed' || (updated.status || '').toLowerCase() === 'pending') ? 'upcoming'
@@ -1591,7 +1596,7 @@ app.put('/api/reschedule-requests/:id', async (req, res) => {
 
       // Sync updated appointment to Firestore
       if (patient && patient.firebaseUid) {
-        const apptDateTime = new Date(`${request.requestedDate}T${request.requestedTime}`).getTime();
+        const apptDateTime = clinicDateTimeToEpoch(request.requestedDate, request.requestedTime);
         await syncAppointmentToFirestore(patient.firebaseUid, request.appointmentId, {
           dateTime: apptDateTime,
           rescheduleStatus: 'approved',
@@ -1885,7 +1890,7 @@ app.post('/api/patient-logs', async (req, res) => {
         await dbHelpers.run("UPDATE patient_logs SET investigationsAttached = 1 WHERE id = ?", [id]);
         // Sync to Firestore
         if (patient && patient.firebaseUid) {
-          const apptDateTime = new Date(`${nextAppt.date}T${nextAppt.time}`).getTime();
+          const apptDateTime = clinicDateTimeToEpoch(nextAppt.date, nextAppt.time);
           await syncAppointmentToFirestore(patient.firebaseUid, nextAppt.id, {
             dateTime: apptDateTime,
             clinic: nextAppt.details || nextAppt.type || 'Clinic',
@@ -2099,7 +2104,7 @@ app.post('/api/sync/patient/:id', async (req, res) => {
     // Sync all appointments for this patient
     const appointments = await dbHelpers.all('SELECT * FROM appointments WHERE patientId = ?', [patient.id]);
     for (const appt of appointments) {
-      const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+      const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
       const investigations = appt.investigations ? JSON.parse(appt.investigations) : [];
       await syncAppointmentToFirestore(patient.firebaseUid, appt.id, {
         dateTime: apptDateTime,
@@ -2176,7 +2181,7 @@ app.post('/api/sync/all', async (req, res) => {
           allergies: patient.allergies || '',
         });
         for (const appt of appts) {
-          const apptDateTime = new Date(`${appt.date}T${appt.time}`).getTime();
+          const apptDateTime = clinicDateTimeToEpoch(appt.date, appt.time);
           await syncAppointmentToFirestore(patient.firebaseUid, appt.id, {
             dateTime: apptDateTime,
             clinic: appt.details || appt.type || 'Clinic',
