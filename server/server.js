@@ -226,7 +226,12 @@ let auth_firebase = null;
 
 try {
   const path = require('path');
-  const serviceAccount = require(path.join(__dirname, 'serviceAccountKey.json'));
+  let serviceAccount;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    serviceAccount = require(path.join(__dirname, 'serviceAccountKey.json'));
+  }
   const firebaseApp = initializeApp({
     credential: cert(serviceAccount)
   });
