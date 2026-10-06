@@ -1,40 +1,24 @@
-# 🏥 MediHub Web Application
+# MediHub Web Application
 
-A modern healthcare management and patient monitoring web application designed to streamline appointment scheduling, patient records, doctor availability, and real-time medical alert management.
+MediHub is a web-based healthcare management application built for doctors and medical staff to manage appointments, patient records, doctor availability, and symptom alerts. This project was developed as part of the Year 3 Semester 6 Software Project module.
 
----
+## Features
 
-## ✨ Features
+- **Dashboard:** Overview of appointment statistics and patient activity.
+- **Appointments Management:** Schedule, edit, view, and manage doctor and patient appointments.
+- **Doctor Availability:** Set and manage daily available time slots for doctors.
+- **Patient Records & History:** View patient profiles, medical logs, and clinical history.
+- **Symptom Alerts:** Track patient-reported symptoms and alert levels in real time.
+- **PDF Export:** Download appointment schedules and patient reports as PDF documents.
 
-- **📊 Dashboard & Analytics:** Comprehensive overview of daily appointments, patient statistics, and status metrics powered by `Recharts`.
-- **📅 Appointment Management:** Interactive calendar system for booking, rescheduling, and viewing doctor & patient appointments.
-- **🩺 Doctor Directory & Availability:** Manage doctor profiles, schedule availability, and filter appointments by specialist.
-- **📁 Patient Records & Medical Logs:** Maintain patient histories, update status logs, and log symptom updates seamlessly.
-- **🚨 Emergency Alert Monitoring:** Real-time symptom alert tracking for doctors and medical staff to respond promptly to patient needs.
-- **📄 PDF Export & Reports:** Generate and export medical reports, prescriptions, and appointment receipts using `jsPDF`.
-- **🔐 Google Authentication:** Secure login integration via `@react-oauth/google`.
+## Tech Stack
 
----
+- **Frontend:** React, React Router
+- **Backend:** Node.js, Express, PostgreSQL
+- **Authentication:** Google OAuth
+- **Libraries:** Recharts, Lucide Icons, jsPDF
 
-## 🛠️ Tech Stack
-
-- **Frontend:** React 18, React Router DOM v6
-- **UI & Icons:** Lucide React Icons, Custom CSS
-- **Data Visualization & Date Libraries:** Recharts, `react-calendar`, `react-datepicker`, `date-fns`
-- **PDF Generation:** `jspdf`, `jspdf-autotable`
-- **Authentication:** `@react-oauth/google`
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Ensure you have the following installed on your machine:
-- [Node.js](https://nodejs.org/) (v16.0.0 or higher)
-- `npm` (v8.0.0 or higher)
-
-### Installation
+## How to Run
 
 1. **Clone the repository:**
    ```bash
@@ -47,36 +31,29 @@ Ensure you have the following installed on your machine:
    npm install
    ```
 
-3. **Start the development server:**
+3. **Start the frontend server:**
    ```bash
    npm start
    ```
-   Open [http://localhost:3000](http://localhost:3000) to view the application in your browser.
 
-4. **Build for production:**
+4. **Start the backend server:**
    ```bash
-   npm run build
+   cd server
+   npm install
+   npm start
    ```
 
----
-
-## 📂 Project Structure
+## Project Structure
 
 ```text
 MediHub-Web/
-├── public/                 # Static assets & HTML template
+├── public/                 # Static assets
+├── server/                 # Backend Node.js / Express API & Database
 ├── src/
-│   ├── components/         # Reusable UI components (alerts, appointments, auth, layout, etc.)
-│   ├── pages/              # Main application pages (Dashboard, Patients, Doctors, Alerts, etc.)
-│   ├── App.js              # Main application router
-│   ├── index.js            # React entry point
-│   └── index.css           # Global design system & utility styles
-├── package.json            # Project dependencies & scripts
-└── README.md               # Project documentation
+│   ├── components/         # UI components
+│   ├── context/            # React Context (Auth, Data)
+│   ├── pages/              # Main application pages
+│   ├── App.js              # Main App Router
+│   └── index.js            # React entry point
+└── package.json
 ```
-
----
-
-## 📄 License
-
-This project is part of the Software Project module (SEM 06). All rights reserved.
