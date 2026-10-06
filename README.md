@@ -57,3 +57,4 @@ MediHub-Web/
 │   └── index.js            # React entry point
 └── package.json
 ```
+
