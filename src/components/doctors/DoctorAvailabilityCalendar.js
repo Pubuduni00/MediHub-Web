@@ -339,8 +339,17 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1000, background: 'rgba(0,0,0,0.4)' }}>
-      <div className="modal-content" style={{ background: '#ffffff', maxWidth: '600px', width: '92%', padding: 0, borderRadius: '12px', overflow: 'hidden' }}>
+    <div className="modal-overlay" style={{ zIndex: 1000, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(2px)' }}>
+      <style>{`
+        @keyframes modalPopIn {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .doctor-modal-box {
+          animation: modalPopIn 0.22s ease-out forwards;
+        }
+      `}</style>
+      <div className="modal-content doctor-modal-box" style={{ background: '#ffffff', maxWidth: '600px', width: '92%', padding: 0, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
 
         {/* Header */}
         <div style={{ padding: '20px 24px 16px 24px', position: 'relative' }}>
