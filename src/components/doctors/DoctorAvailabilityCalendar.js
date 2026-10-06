@@ -554,20 +554,24 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
                     key={item.date}
                     style={{
                       border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       padding: '14px 16px',
                       background: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
                     }}
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <Calendar size={15} color="#2563eb" />
-                        <span style={{ fontWeight: 600, fontSize: '14.5px', color: '#1e293b' }}>
+                        <span style={{ fontWeight: 600, fontSize: '14.5px', color: '#0f172a' }}>
                           {format(parseLocalDate(item.date), 'EEEE, dd MMMM yyyy')}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 7px', borderRadius: '12px', fontWeight: 500 }}>
+                          {item.ranges.length} {item.ranges.length === 1 ? 'range' : 'ranges'}
                         </span>
                       </div>
 
