@@ -469,7 +469,23 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
 
               <button
                 onClick={handleAddRange}
-                style={{ background: 'transparent', color: '#2563eb', border: '1px dashed #cbd5e1', width: '100%', padding: '10px', borderRadius: '6px', fontWeight: 500, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '8px' }}
+                style={{
+                  background: 'transparent',
+                  color: '#2563eb',
+                  border: '1px dashed #cbd5e1',
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginTop: '8px',
+                  transition: 'all 0.2s ease-in-out'
+                }}
               >
                 <Plus size={16} /> Add another time range
               </button>
@@ -484,7 +500,22 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                style={{ width: '100%', justifyContent: 'center', background: '#2563eb', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 500, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  background: saving ? '#93c5fd' : '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  fontSize: '15px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background-color 0.2s ease, transform 0.1s ease'
+                }}
               >
                 <Check size={18} /> {saving ? 'Saving...' : 'Save Availability Ranges'}
               </button>
