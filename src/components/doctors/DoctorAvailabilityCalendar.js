@@ -2,10 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, Plus, Trash2, Calendar, Clock, Edit2, List } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 const parseLocalDate = (dateStr) => {
-  if (!dateStr) return new Date();
+  if (!dateStr || !DATE_REGEX.test(dateStr)) return new Date();
   const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  const d = new Date(year, month - 1, day);
+  return isNaN(d.getTime()) ? new Date() : d;
+};
+
+const safeFormat = (dateStr, fmt) => {
+  try {
+    if (!dateStr || !DATE_REGEX.test(dateStr)) return '—';
+    const d = parseLocalDate(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    return format(d, fmt);
+  } catch { return '—'; }
 };
 
 const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
@@ -15,6 +27,7 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [allSavedSchedules, setAllSavedSchedules] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedJustNow, setSavedJustNow] = useState(false);
 
   // Generate 15 min intervals for dropdowns covering 24h
   const generateDropdownTimes = () => {
@@ -119,13 +132,15 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
 
       const groupedByDate = {};
       data.forEach(slot => {
+        // Guard: skip slots with missing or malformed date
+        if (!slot.date || !DATE_REGEX.test(slot.date)) return;
         if (!groupedByDate[slot.date]) groupedByDate[slot.date] = [];
         groupedByDate[slot.date].push(slot.time);
       });
 
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const formattedList = Object.keys(groupedByDate)
-        .filter(d => d >= todayStr)
+        .filter(d => DATE_REGEX.test(d) && d >= todayStr)
         .sort()
         .map(d => ({
           date: d,
@@ -300,9 +315,10 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
       });
 
       if (response.ok) {
-        alert('Availability saved successfully!');
         await fetchAllSavedSchedules();
-        onClose();
+        setSavedJustNow(true);
+        setTimeout(() => setSavedJustNow(false), 3000);
+        setActiveTab('saved');
       } else {
         alert('Failed to save availability');
       }
@@ -533,6 +549,16 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
         ) : (
           /* SAVED SCHEDULES TAB */
           <div style={{ padding: '24px', maxHeight: '420px', overflowY: 'auto' }}>
+            {savedJustNow && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: '#f0fdf4', border: '1px solid #86efac',
+                borderRadius: '8px', padding: '10px 14px', marginBottom: '16px',
+                fontSize: '13.5px', fontWeight: 600, color: '#16a34a'
+              }}>
+                <Check size={16} /> Availability saved successfully!
+              </div>
+            )}
             {loadingSaved ? (
               <p style={{ color: '#64748b', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>Loading saved schedules...</p>
             ) : allSavedSchedules.length === 0 ? (
@@ -568,7 +594,7 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <Calendar size={15} color="#2563eb" />
                         <span style={{ fontWeight: 600, fontSize: '14.5px', color: '#0f172a' }}>
-                          {format(parseLocalDate(item.date), 'EEEE, dd MMMM yyyy')}
+                          {safeFormat(item.date, 'EEEE, dd MMMM yyyy')}
                         </span>
                         <span style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 7px', borderRadius: '12px', fontWeight: 500 }}>
                           {item.ranges.length} {item.ranges.length === 1 ? 'range' : 'ranges'}
