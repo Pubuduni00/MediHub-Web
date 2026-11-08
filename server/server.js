@@ -12,6 +12,10 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/version', (req, res) => {
+  res.json({ version: 'v3_dedup_active', commit: '676911e', time: new Date().toISOString() });
+});
+
 app.post('/api/patients/:patientId/medications/:medId/stop', async (req, res) => {
   const { patientId, medId } = req.params;
   const { doctorId: requestingDoctorId } = req.body || {};
