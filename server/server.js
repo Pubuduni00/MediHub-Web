@@ -244,6 +244,76 @@ try {
   console.warn('Firebase sync will be disabled. Add serviceAccountKey.json to enable it.');
 }
 
+
+// Helper to parse dates from mobile/client reliably with Sri Lanka timezone fallback
+function parseClientDateToISO(dateVal) {
+  if (!dateVal) return new Date().toISOString();
+  if (typeof dateVal === 'number') {
+    return new Date(dateVal).toISOString();
+  }
+  const s = String(dateVal).trim();
+  if (s.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  }
+  const normalized = s.replace(' ', 'T');
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (match) {
+    const [_, y, m, d, hh, mm, ss = '00'] = match;
+    const epoch = Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss)) - (330 * 60 * 1000);
+    return new Date(epoch).toISOString();
+  }
+  const fallback = new Date(s);
+  return isNaN(fallback.getTime()) ? new Date().toISOString() : fallback.toISOString();
+}
+
+// Helper to record a symptom log with strict deduplication (within 10-minute window)
+async function recordSymptomLog({ patient, dateVal, symptoms, healthStatus, notes, reportedVia = 'MediHub App' }) {
+  const dateStr = parseClientDateToISO(dateVal);
+  const targetEpoch = new Date(dateStr).getTime();
+  const symptomsArray = Array.isArray(symptoms) ? symptoms : [];
+  const statusNormalized = (healthStatus || 'stable').toLowerCase();
+  const severity = statusNormalized === 'critical' ? 'Severe'
+    : statusNormalized === 'warning' ? 'Moderate' : 'Mild';
+
+  const recentLogs = await dbHelpers.all(
+    'SELECT * FROM symptom_logs WHERE patientid = ? ORDER BY date DESC LIMIT 10',
+    [patient.id]
+  );
+  const isDuplicate = recentLogs.some(log => {
+    const logEpoch = new Date(log.date).getTime();
+    const diffMin = Math.abs(logEpoch - targetEpoch) / (1000 * 60);
+    return diffMin <= 10;
+  });
+
+  if (isDuplicate) {
+    console.log(`[Deduplication] Skipped duplicate check-in for patient ${patient.name} (${patient.id}) around ${dateStr}`);
+    return null;
+  }
+
+  const id = await generateNextId('symptom_logs', 'SL');
+  await dbHelpers.run(
+    'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, notes || '', reportedVia]
+  );
+
+  if (statusNormalized === 'critical') {
+    const alertId = await generateNextId('alerts', 'AL');
+    await dbHelpers.run(
+      'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+      [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
+    );
+  } else if (statusNormalized === 'warning' && symptomsArray.length > 0) {
+    const alertId = await generateNextId('alerts', 'AL');
+    await dbHelpers.run(
+      'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+      [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
+    );
+  }
+
+  return id;
+}
+
 // Helper to calculate end date from duration dropdown
 function clinicDateTimeToEpoch(date, time) {
   const [year, month, day] = date.split('-').map(Number);
@@ -426,35 +496,14 @@ function initFirestoreListeners() {
               [firebaseUid]
             );
             if (!patient) continue;
-            const dateStr = checkInData.date ? new Date(checkInData.date).toISOString() : new Date().toISOString();
-            const existingLog = await dbHelpers.get(
-              'SELECT * FROM symptom_logs WHERE patientid = ? AND date = ?',
-              [patient.id, dateStr]
-            );
-            if (!existingLog) {
-              const id = await generateNextId('symptom_logs', 'SL');
-              const symptomsArray = Array.isArray(checkInData.symptoms) ? checkInData.symptoms : [];
-              const healthStatus = checkInData.healthStatus || 'stable';
-              const severity = healthStatus === 'critical' ? 'Severe'
-                : healthStatus === 'warning' ? 'Moderate' : 'Mild';
-              await dbHelpers.run(
-                'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, checkInData.additionalNotes || '', 'MediHub App']
-              );
-              if (healthStatus === 'critical') {
-                const alertId = await generateNextId('alerts', 'AL');
-                await dbHelpers.run(
-                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                  [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
-                );
-              } else if (healthStatus === 'warning' && symptomsArray.length > 0) {
-                const alertId = await generateNextId('alerts', 'AL');
-                await dbHelpers.run(
-                  'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-                  [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
-                );
-              }
-            }
+            await recordSymptomLog({
+              patient,
+              dateVal: checkInData.date,
+              symptoms: checkInData.symptoms,
+              healthStatus: checkInData.healthStatus,
+              notes: checkInData.additionalNotes || '',
+              reportedVia: 'MediHub App'
+            });
           } catch (err) {
             console.error('[Listener] Check-in error:', err.message);
           }
@@ -851,33 +900,15 @@ app.post('/api/mobile/checkin', async (req, res) => {
     );
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    // Save to symptom_logs table
-    const id = await generateNextId('symptom_logs', 'SL');
-    const dateStr = date ? new Date(date).toISOString() : new Date().toISOString();
-    const symptomsArray = Array.isArray(symptoms) ? symptoms : [];
-    const severity = health_status === 'critical' ? 'Severe'
-      : health_status === 'warning' ? 'Moderate' : 'Mild';
-
-    await dbHelpers.run(
-      'INSERT INTO symptom_logs (id, patientId, patientName, date, symptoms, severity, notes, reportedVia) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, patient.id, patient.name, dateStr, JSON.stringify(symptomsArray), severity, notes || '', 'MediHub App']
-    );
-
-    // Auto-create alert if critical
-    if (health_status === 'critical') {
-      const alertId = await generateNextId('alerts', 'AL');
-      await dbHelpers.run(
-        'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-        [alertId, patient.id, patient.name, 'Symptom', `CRITICAL: ${patient.name} reported critical health status via app. Symptoms: ${symptomsArray.join(', ')}`, 'danger', dateStr]
-      );
-      console.log(`Critical alert created for patient ${patient.name}`);
-    } else if (health_status === 'warning' && symptomsArray.length > 0) {
-      const alertId = await generateNextId('alerts', 'AL');
-      await dbHelpers.run(
-        'INSERT INTO alerts (id, patientId, patientName, type, message, severity, date, read) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
-        [alertId, patient.id, patient.name, 'Symptom', `${patient.name} reported warning symptoms: ${symptomsArray.join(', ')}`, 'warning', dateStr]
-      );
-    }
+    // Save to symptom_logs table with deduplication and timezone normalization
+    const id = await recordSymptomLog({
+      patient,
+      dateVal: date,
+      symptoms,
+      healthStatus: health_status,
+      notes,
+      reportedVia: 'MediHub App'
+    });
 
     return res.status(201).json({ success: true, id });
   } catch (err) {
