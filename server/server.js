@@ -282,10 +282,20 @@ async function recordSymptomLog({ patient, dateVal, symptoms, healthStatus, note
     'SELECT * FROM symptom_logs WHERE patientid = ? ORDER BY date DESC LIMIT 10',
     [patient.id]
   );
+  // In-memory instant lock to stop parallel race conditions (both hitting server within seconds)
+  if (!global.recentCheckInLocks) global.recentCheckInLocks = new Map();
+  const lockKey = `${patient.id}_${symptomsArray.slice().sort().join(',')}`;
+  const lastTime = global.recentCheckInLocks.get(lockKey);
+  if (lastTime && (Date.now() - lastTime < 60000)) {
+    console.log(`[Deduplication - Memory Lock] Skipped duplicate concurrent check-in for ${patient.name}`);
+    return null;
+  }
+  global.recentCheckInLocks.set(lockKey, Date.now());
+
   const isDuplicate = recentLogs.some(log => {
     const logEpoch = new Date(log.date).getTime();
     const diffMin = Math.abs(logEpoch - targetEpoch) / (1000 * 60);
-    return diffMin <= 10;
+    return diffMin <= 15;
   });
 
   if (isDuplicate) {
