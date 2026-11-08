@@ -249,22 +249,24 @@ try {
 function parseClientDateToISO(dateVal) {
   if (!dateVal) return new Date().toISOString();
   if (typeof dateVal === 'number') {
-    return new Date(dateVal).toISOString();
+    const d = new Date(dateVal);
+    // If phone stored epoch with Sri Lanka local offset erroneously in future
+    if (d.getTime() - Date.now() > 60 * 60 * 1000) {
+      return new Date(d.getTime() - (330 * 60 * 1000)).toISOString();
+    }
+    return d.toISOString();
   }
   const s = String(dateVal).trim();
-  if (s.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    // Check if the parsed time is > 1 hour in future (the classic +5:30 Sri Lanka local timezone misinterpretation)
+    if (d.getTime() - Date.now() > 60 * 60 * 1000) {
+      const fixedEpoch = d.getTime() - (330 * 60 * 1000);
+      return new Date(fixedEpoch).toISOString();
+    }
+    return d.toISOString();
   }
-  const normalized = s.replace(' ', 'T');
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (match) {
-    const [_, y, m, d, hh, mm, ss = '00'] = match;
-    const epoch = Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss)) - (330 * 60 * 1000);
-    return new Date(epoch).toISOString();
-  }
-  const fallback = new Date(s);
-  return isNaN(fallback.getTime()) ? new Date().toISOString() : fallback.toISOString();
+  return new Date().toISOString();
 }
 
 // Helper to record a symptom log with strict deduplication (within 10-minute window)
