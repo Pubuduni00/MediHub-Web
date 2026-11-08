@@ -126,7 +126,8 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
     if (!doctorId) return;
     try {
       setLoadingSaved(true);
-      const res = await fetch(`http://localhost:5000/api/doctors/${doctorId}/availability`);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${API_URL}/doctors/${doctorId}/availability`);
       if (!res.ok) return;
       const data = await res.json();
 
@@ -169,7 +170,8 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
     const fetchAvailability = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:5000/api/doctors/${doctorId}/availability?date=${dateStr}`);
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${API_URL}/doctors/${doctorId}/availability?date=${dateStr}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
 
@@ -334,7 +336,8 @@ const DoctorAvailabilityCalendar = ({ doctorId, doctorName, onClose }) => {
   const handleDeleteDateSchedule = async (dateStr) => {
     if (!window.confirm(`Are you sure you want to clear availability for ${dateStr}?`)) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/doctors/${doctorId}/availability`, {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_URL}/doctors/${doctorId}/availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr, slots: [] })
